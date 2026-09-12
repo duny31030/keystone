@@ -3,17 +3,29 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "keystone-dev"
+name = "keystone-hook"
 version = "0.1.0"
 description = "Keystone: CodeBuddy 流程与上下文增强层（Hook Runner + 本地任务/规范管理）"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "Proprietary" }
-authors = [{ name = "duningyuan" }]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "duny31030" }]
+keywords = ["codebuddy", "hooks", "ai-coding", "workflow", "task-management"]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Natural Language :: Chinese (Simplified)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Operating System :: POSIX",
+    "Topic :: Software Development :: Quality Assurance",
 ]
 
 # 运行时零依赖：hook runner 与 CLI 全部使用标准库。
@@ -23,6 +35,11 @@ dev = ["pytest>=7"]
 [project.scripts]
 keystone = "keystone.cli:main"
 keystone-hook = "keystone.hook.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/duny31030/keystone"
+Repository = "https://github.com/duny31030/keystone"
+Issues = "https://github.com/duny31030/keystone/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

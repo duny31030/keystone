@@ -34,6 +34,12 @@ HookOutput JSON → stdout，退出码 0
 ## 安装
 
 ```bash
+# 正式发布后
+pip install keystone-hook
+
+# 当前仅在 TestPyPI（测试站）
+pip install --index-url https://test.pypi.org/simple/ keystone-hook
+
 # 仓库内开发安装（Python ≥ 3.9，运行时零依赖）
 pip install -e .
 ```
