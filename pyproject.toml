@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "keystone-dev"
+version = "0.1.0"
+description = "Keystone: CodeBuddy 流程与上下文增强层（Hook Runner + 本地任务/规范管理）"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Proprietary" }
+authors = [{ name = "duningyuan" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Operating System :: POSIX",
+]
+
+# 运行时零依赖：hook runner 与 CLI 全部使用标准库。
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+keystone = "keystone.cli:main"
+keystone-hook = "keystone.hook.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
