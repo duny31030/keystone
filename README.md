@@ -34,15 +34,17 @@ HookOutput JSON → stdout，退出码 0
 ## 安装
 
 ```bash
-# 正式发布后
-pip install keystone-hook
+# npm（Node 垫片 + 内嵌 Python 源码，无需 pip 依赖）
+npm install -g keystone-hook
 
-# 当前仅在 TestPyPI（测试站）
+# PyPI（TestPyPI 测试站）
 pip install --index-url https://test.pypi.org/simple/ keystone-hook
 
 # 仓库内开发安装（Python ≥ 3.9，运行时零依赖）
 pip install -e .
 ```
+
+两种安装方式效果一致：npm 包内嵌同一份 Python 源码，由 Node 垫片定位 `python3` 执行（可用 `KEYSTONE_PYTHON` 环境变量指定解释器）。npm 装的包发布新版本后用 `npm update -g keystone-hook` 升级。
 
 ## 快速上手
 
