@@ -152,3 +152,24 @@ COMPLETED 写入拒绝、.keystone 状态保护、计划阶段拦截、Stop remi
 ### Status
 
 [OK] **Completed**
+
+
+## Session 8: 实现发布工程化基础设施
+
+**Date**: 2026-09-20
+**Task**: 实现发布工程化基础设施
+**Branch**: `main`
+
+### Summary
+
+实现 release.sh 发布脚本（版本校验、测试、构建、tag、推送）、CHANGELOG.md、GitHub Actions workflow（tag 触发，发布步骤默认注释）。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c589717` | (see git log) |
+
+### Status
+
+[OK] **Completed**
