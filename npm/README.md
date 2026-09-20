@@ -112,11 +112,11 @@ keystone task reopen TASK-001           # COMPLETED → IMPLEMENTING
 |---|---|
 | `SessionStart` | 注入项目资料、规范与禁止事项 |
 | `UserPromptSubmit` | 解析会话绑定任务（支持 `TASK-123` / `#123` 切换），注入任务上下文与阶段要求 |
-| `PreToolUse` | 计划确认前真实拒绝写入 |
-| `Stop` | `reminder` 模式注入完成检查清单 |
+| `PreToolUse` | 计划确认前真实拒绝写入；任务完成后真实拒绝继续修改；保护 `.keystone` 状态文件不被直接改写 |
+| `Stop` | `reminder` 模式注入完成检查清单（已实测）；`enforce` 的 block 输出已发送但当前 CodeBuddy 未表现出真正阻止结束 |
 | `SessionEnd` | 记录会话级元数据（结束时间、原因、session ID、当前任务）到 `.keystone/.state/events.jsonl` |
 
-`PreToolUse` 的任务完成后拒绝修改和 `.keystone` 状态文件保护，以及 `stop_mode: enforce` 的 block 输出和 `stop_hook_active` 循环保护，均已通过本地协议测试，但尚待 CodeBuddy 实机验证。`PostToolUse` 与 `PreCompact` 未在当前 CodeBuddy 版本确认，因此 0.1.1 起不再默认注册或公开为可用能力。
+`stop_hook_active` 循环保护仅在本地协议测试中验证；真实 CodeBuddy 中会话结束由宿主控制，无法通过重复发送"结束会话"来触发二次 Stop，因此该字段的实际效果尚不能确认。`PostToolUse` 与 `PreCompact` 未在当前 CodeBuddy 版本确认，因此 0.1.1 起不再默认注册或公开为可用能力。
 
 异常原则：**控制类 Hook fail-open，记录类 fail-silent** —— Keystone 出任何问题都不影响 CodeBuddy 正常使用。未初始化 `.keystone/` 的项目完全零打扰。
 
@@ -124,7 +124,7 @@ keystone task reopen TASK-001           # COMPLETED → IMPLEMENTING
 
 | 字段 | 说明 | 默认 |
 |---|---|---|
-| `stop_mode` | `reminder` 注入检查清单（已实测）/ `enforce` 返回 block 输出（待 CodeBuddy 实测） | `reminder` |
+| `stop_mode` | `reminder` 注入检查清单（已实测）/ `enforce` 返回 block 输出，但当前 CodeBuddy 未表现出阻止结束的行为 | `reminder` |
 | `policy_mode` | `permissive` / `strict`（strict 下未绑定任务也禁止写文件） | `permissive` |
 | `test_command` / `build_command` | 注入给 AI 的验证/构建命令 | 按语言预设 |
 
