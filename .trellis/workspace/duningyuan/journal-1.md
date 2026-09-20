@@ -47,3 +47,24 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 3: 实现本地诊断与安全生命周期命令
+
+**Date**: 2026-09-20
+**Task**: 实现本地诊断与安全生命周期命令
+**Branch**: `main`
+
+### Summary
+
+实现 init --dry-run、status、doctor、uninstall/purge；审查修复第三方 hook 归属、status 错误退出码与 gitignore 格式保真；86 测试通过，Python/npm fresh-install 生命周期烟测通过；未发布。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fea745f` | (see git log) |
+
+### Status
+
+[OK] **Completed**
