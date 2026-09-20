@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -e '.[dev]'
+
+      - name: Run tests
+        run: pytest
+
+      - name: Sync npm package
+        run: python3 scripts/sync_npm.py
+
+      - name: Build Python artifacts
+        run: |
+          pip install build
+          python -m build
+
+      - name: Build npm artifact
+        run: |
+          cd npm
+          npm pack --dry-run
+          npm pack
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: |
+            dist/
+            npm/*.tgz
+
+  # 发布步骤默认注释，等用户决定后再启用
+  # publish-npm:
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: '22'
+  #         registry-url: 'https://registry.npmjs.org'
+  #     - run: python3 scripts/sync_npm.py
+  #     - run: cd npm && npm publish --access public
+  #       env:
+  #         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # publish-testpypi:
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.11'
+  #     - run: pip install build
+  #     - run: python -m build
+  #     - uses: pypa/gh-action-pypi-publish@release/v1
+  #       with:
+  #         repository-url: https://test.pypi.org/legacy/
+  #         password: ${{ secrets.TESTPYPI_TOKEN }}
