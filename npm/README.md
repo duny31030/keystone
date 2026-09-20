@@ -99,10 +99,13 @@ TODO → PLANNING → PLAN_CONFIRMED → IMPLEMENTING → VERIFYING → COMPLETE
 ```bash
 keystone task list
 keystone task show TASK-001
-keystone task advance TASK-001          # 沿主链走下一步（--to 可指定合法目标）
-keystone task complete TASK-001         # VERIFYING → COMPLETED
-keystone task reopen TASK-001           # COMPLETED → IMPLEMENTING
+keystone task plan TASK-001            # 生成 plan.md 模板（PLANNING 阶段）
+keystone task advance TASK-001         # 沿主链走下一步（--to 可指定合法目标）
+keystone task complete TASK-001        # VERIFYING → COMPLETED
+keystone task reopen TASK-001          # COMPLETED → IMPLEMENTING
 ```
+
+**计划确认前置条件**：`PLANNING → PLAN_CONFIRMED` 要求任务目录存在 `plan.md`。执行 `keystone task plan TASK-001` 会生成包含目标、影响范围、实施步骤、验证方案、风险与未决事项的模板；不强制内容结构，只要求文件存在且非空。`keystone task show` 和 `keystone task list` 会显示计划文件状态。
 
 ## CodeBuddy 已验证 Hook
 

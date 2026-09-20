@@ -53,8 +53,12 @@ def test_full_session_scenario(tmp_path, monkeypatch, capsys):
                       monkeypatch, capsys)
     assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
 
+    # 5.5 生成计划文件，然后推进到 PLAN_CONFIRMED
+    tasks.write_plan(KeystoneLayout(tmp_path), "TASK-001")
+    assert keystone_main(["task", "advance", "TASK-001"]) == 0
+    capsys.readouterr()
+
     # 6. 计划确认 → IMPLEMENTING → 写文件放行（无输出）
-    tasks.transition_task(KeystoneLayout(tmp_path), "TASK-001", "PLAN_CONFIRMED")
     tasks.transition_task(KeystoneLayout(tmp_path), "TASK-001", "IMPLEMENTING")
     code, out = _hook(tmp_path, "pre-tool-use",
                       {"cwd": str(tmp_path), "session_id": "s1",

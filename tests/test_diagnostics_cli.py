@@ -24,7 +24,9 @@ def test_status_summarizes_initialized_project(project_dir, monkeypatch, capsys)
     layout = KeystoneLayout(project_dir)
     tasks.create_task(layout, "pending", pending_confirmation=True)
     task = tasks.create_task(layout, "done")
-    for target in ("PLANNING", "PLAN_CONFIRMED", "IMPLEMENTING", "VERIFYING", "COMPLETED"):
+    tasks.transition_task(layout, task["code"], "PLANNING")
+    tasks.write_plan(layout, task["code"])
+    for target in ("PLAN_CONFIRMED", "IMPLEMENTING", "VERIFYING", "COMPLETED"):
         tasks.transition_task(layout, task["code"], target)
     assert keystone_main(["status", "--dir", str(project_dir)]) == 0
     output = capsys.readouterr().out

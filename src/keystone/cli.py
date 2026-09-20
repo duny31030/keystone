@@ -214,7 +214,8 @@ def _dispatch_task(args: argparse.Namespace, layout) -> int:
             return 0
         for t in all_tasks:
             flag = " (待确认)" if t.get("pending_confirmation") else ""
-            print(f"{t['code']}  [{t['status']:>14}]  {t.get('title', '')}{flag}")
+            plan_flag = " [plan]" if (layout.task_dir(t["code"]) / "plan.md").is_file() else ""
+            print(f"{t['code']}  [{t['status']:>14}]  {t.get('title', '')}{flag}{plan_flag}")
         return 0
 
     if action == "show":
@@ -225,11 +226,19 @@ def _dispatch_task(args: argparse.Namespace, layout) -> int:
         if t.get("description_md", "").strip():
             print()
             print(t["description_md"].strip())
+        plan_status = "已存在" if t.get("has_plan") else "缺失"
+        print(f"\n计划文件：{plan_status}（{t['plan_path']}）")
         print()
         print("流转记录：")
         for tr in t.get("transitions", []):
             print(f"  {tr.get('at', '?')}  {tr.get('from') or '—'} → {tr.get('to')}"
                   + (f"  ({tr.get('reason')})" if tr.get("reason") else ""))
+        return 0
+
+    if action == "plan":
+        path = task_store.write_plan(layout, args.code)
+        print(f"✓ 已生成计划模板：{path}")
+        print("  填写后运行 keystone task advance 推进到 PLAN_CONFIRMED")
         return 0
 
     if action == "advance":
@@ -303,6 +312,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_show = task_sub.add_parser("show", help="任务详情")
     p_show.add_argument("code")
+
+    p_plan = task_sub.add_parser("plan", help="生成结构化计划模板 plan.md")
+    p_plan.add_argument("code")
 
     p_advance = task_sub.add_parser("advance", help="沿状态机推进（或 --to 指定合法目标状态）")
     p_advance.add_argument("code")

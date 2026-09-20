@@ -17,6 +17,32 @@ from keystone.util import atomic_write_json, now_iso
 _CODE_RE = re.compile(r"^TASK-(\d{3,})$")
 
 
+_PLAN_TEMPLATE = """\
+# 计划
+
+## 目标
+
+（本任务要解决什么问题，最终交付什么）
+
+## 影响范围
+
+（涉及哪些模块、文件、接口、配置；不涉及的边界）
+
+## 实施步骤
+
+1. （第一步）
+2. （第二步）
+
+## 验证方案
+
+（执行哪些验证命令，期望什么结果；无法验证时说明原因）
+
+## 风险与未决事项
+
+（可能的坑、需要用户确认的点）
+"""
+
+
 def _write_prd(task_dir: Path, title: str, description: str, acceptance_criteria: list[str]) -> None:
     lines = [f"# {title}", "", "## 描述", "", description.strip() or "（待补充）", "", "## 验收标准"]
     if acceptance_criteria:
@@ -75,7 +101,7 @@ def _task_json_path(layout: KeystoneLayout, code: str) -> Path:
 
 
 def load_task(layout: KeystoneLayout, code: str) -> dict:
-    """读取任务；附带的 description_md 取自 prd.md（缺失时为空）。"""
+    """读取任务；附带的 description_md 取自 prd.md（缺失时为空），plan_md 取自 plan.md。"""
     path = _task_json_path(layout, code)
     try:
         task = json.loads(path.read_text(encoding="utf-8"))
@@ -83,6 +109,8 @@ def load_task(layout: KeystoneLayout, code: str) -> dict:
         raise KeystoneError(f"任务 {code} 的 task.json 无法读取：{exc}") from exc
     prd = layout.task_dir(code) / "prd.md"
     task["description_md"] = prd.read_text(encoding="utf-8") if prd.is_file() else ""
+    task["plan_path"] = str(plan_path(layout, code))
+    task["has_plan"] = has_plan(layout, code)
     return task
 
 
@@ -115,11 +143,35 @@ def find_task(layout: KeystoneLayout, code: str) -> dict | None:
         return None
 
 
+def plan_path(layout: KeystoneLayout, code: str) -> Path:
+    return layout.task_dir(code) / "plan.md"
+
+
+def has_plan(layout: KeystoneLayout, code: str) -> bool:
+    path = plan_path(layout, code)
+    return path.is_file() and path.read_text(encoding="utf-8").strip() != ""
+
+
+def write_plan(layout: KeystoneLayout, code: str) -> Path:
+    """生成 plan.md 模板；已存在则抛错，不覆盖。"""
+    task = load_task(layout, code)
+    path = plan_path(layout, code)
+    if path.exists():
+        raise KeystoneError(f"任务 {code} 已有计划文件：{path}")
+    path.write_text(_PLAN_TEMPLATE, encoding="utf-8")
+    return path
+
+
 def transition_task(layout: KeystoneLayout, code: str, target: str, reason: str = "") -> dict:
     """校验并执行一次状态流转，记录流转审计。"""
     task = load_task(layout, code)
     current = task["status"]
     statemachine.validate_transition(current, target)
+    if current == "PLANNING" and target == "PLAN_CONFIRMED" and not has_plan(layout, code):
+        raise KeystoneError(
+            f"任务 {code} 没有计划文件（plan.md）。"
+            f"先执行 keystone task plan {code} 生成模板，填写后再推进。"
+        )
     task["transitions"] = task.get("transitions", []) + [
         {"from": current, "to": target, "at": now_iso(), "reason": reason}
     ]

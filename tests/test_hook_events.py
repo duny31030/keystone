@@ -95,6 +95,7 @@ def test_pre_tool_use_allows_read_and_write_tools_after_confirm(layout):
     t = tasks.create_task(layout, "A")
     code = t["code"]
     tasks.transition_task(layout, code, "PLANNING")
+    tasks.write_plan(layout, code)
     tasks.transition_task(layout, code, "PLAN_CONFIRMED")
     sessions.bind_session(layout, "sess-1", code)
     assert events.pre_tool_use(
@@ -108,7 +109,9 @@ def test_pre_tool_use_allows_read_and_write_tools_after_confirm(layout):
 def test_pre_tool_use_denies_write_when_completed(layout):
     t = tasks.create_task(layout, "A")
     code = t["code"]
-    for status in ("PLANNING", "PLAN_CONFIRMED", "IMPLEMENTING", "VERIFYING", "COMPLETED"):
+    tasks.transition_task(layout, code, "PLANNING")
+    tasks.write_plan(layout, code)
+    for status in ("PLAN_CONFIRMED", "IMPLEMENTING", "VERIFYING", "COMPLETED"):
         tasks.transition_task(layout, code, status)
     sessions.bind_session(layout, "sess-1", code)
     out = events.pre_tool_use(
@@ -121,6 +124,7 @@ def test_pre_tool_use_denies_write_when_completed(layout):
 def test_pre_tool_use_protects_keystone_state_files(layout):
     t = tasks.create_task(layout, "A")
     tasks.transition_task(layout, t["code"], "PLANNING")
+    tasks.write_plan(layout, t["code"])
     tasks.transition_task(layout, t["code"], "PLAN_CONFIRMED")  # 已过计划阶段
     sessions.bind_session(layout, "sess-1", t["code"])
     for target in (
@@ -203,7 +207,9 @@ def test_stop_allows_completed_in_enforce(layout):
     save_project(layout, project)
     t = tasks.create_task(layout, "A")
     code = t["code"]
-    for status in ("PLANNING", "PLAN_CONFIRMED", "IMPLEMENTING", "VERIFYING", "COMPLETED"):
+    tasks.transition_task(layout, code, "PLANNING")
+    tasks.write_plan(layout, code)
+    for status in ("PLAN_CONFIRMED", "IMPLEMENTING", "VERIFYING", "COMPLETED"):
         tasks.transition_task(layout, code, status)
     sessions.bind_session(layout, "sess-1", code)
     out = events.stop(make_fields(), layout)

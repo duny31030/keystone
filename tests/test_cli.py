@@ -167,6 +167,8 @@ def test_task_lifecycle_cli(project_dir, capsys, monkeypatch):
 
     code, out = _run_task(["task", "advance", "TASK-001"], capsys)  # TODO → PLANNING
     assert "PLANNING" in out
+    code, out = _run_task(["task", "plan", "TASK-001"], capsys)
+    assert "已生成计划模板" in out
     code, out = _run_task(["task", "advance", "TASK-001"], capsys)  # → PLAN_CONFIRMED
     assert "PLAN_CONFIRMED" in out
     code, out = _run_task(["task", "advance", "TASK-001"], capsys)  # → IMPLEMENTING
