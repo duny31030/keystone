@@ -131,3 +131,24 @@ COMPLETED 写入拒绝、.keystone 状态保护、计划阶段拦截、Stop remi
 ### Status
 
 [OK] **Completed**
+
+
+## Session 7: 实现 keystone events list 命令
+
+**Date**: 2026-09-20
+**Task**: 实现 keystone events list 命令
+**Branch**: `main`
+
+### Summary
+
+实现 events list：只读列出 SessionEnd 元数据，支持按任务/会话/事件过滤，跳过损坏行；111 测试全过。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b14d0bd` | (see git log) |
+
+### Status
+
+[OK] **Completed**
