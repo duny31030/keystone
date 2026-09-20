@@ -110,3 +110,24 @@ COMPLETED 写入拒绝、.keystone 状态保护、计划阶段拦截、Stop remi
 ### Status
 
 [OK] **Completed**
+
+
+## Session 6: 实现 keystone doctor --fix 自动修复
+
+**Date**: 2026-09-20
+**Task**: 实现 keystone doctor --fix 自动修复
+**Branch**: `main`
+
+### Summary
+
+实现 doctor --fix：自动补齐缺失 Hook 注册、清理退役条目、补 gitignore、创建缺失目录和规范模板；不修复损坏 JSON；103 测试全过。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `71a670e` | (see git log) |
+
+### Status
+
+[OK] **Completed**
