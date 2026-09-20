@@ -89,3 +89,24 @@ COMPLETED 写入拒绝、.keystone 状态保护、计划阶段拦截、Stop remi
 ### Status
 
 [OK] **Completed**
+
+
+## Session 5: 实现 keystone task plan 命令
+
+**Date**: 2026-09-20
+**Task**: 实现 keystone task plan 命令
+**Branch**: `main`
+
+### Summary
+
+实现 plan.md 模板生成、PLANNING→PLAN_CONFIRMED 的 plan.md 存在性校验、task show/list 的 plan 状态显示；95 个测试全过。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f447da2` | (see git log) |
+
+### Status
+
+[OK] **Completed**
