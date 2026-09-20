@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 3
+- **Total Sessions**: 4
 - **Last Active**: 2026-09-20
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~70 | Active |
+| `journal-1.md` | ~91 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 4 | 2026-09-20 | 真实 CodeBuddy 控制 Hook 验证完成 | `f5cb3d9` | `main` |
 | 3 | 2026-09-20 | 实现本地诊断与安全生命周期命令 | `fea745f` | `main` |
 | 2 | 2026-09-20 | 验证并收敛 CodeBuddy Hook 兼容性 | `0687b01` | `main` |
 | 1 | 2026-09-12 | Keystone v1 实现完成 | `920bec0` | `main` |

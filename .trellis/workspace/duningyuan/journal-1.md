@@ -68,3 +68,24 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 4: 真实 CodeBuddy 控制 Hook 验证完成
+
+**Date**: 2026-09-20
+**Task**: 真实 CodeBuddy 控制 Hook 验证完成
+**Branch**: `main`
+
+### Summary
+
+COMPLETED 写入拒绝、.keystone 状态保护、计划阶段拦截、Stop reminder、SessionEnd 均已实机验证；Stop enforce 未观察到阻断，stop_hook_active 无法通过重复结束会话触发，README 已按实机结果更新。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f5cb3d9` | (see git log) |
+
+### Status
+
+[OK] **Completed**
