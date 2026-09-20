@@ -140,31 +140,3 @@ def render_stop_checklist(project: dict, task: dict | None) -> str:
         ]
     lines += ["", "</keystone-checklist>"]
     return "\n".join(lines)
-
-
-def render_pre_compact(project: dict, task: dict | None, specs: list[tuple[str, str]]) -> str:
-    """PreCompact：上下文压缩前恢复关键信息（精简版）。"""
-    lines = [
-        "<keystone-context>",
-        "# Keystone：上下文压缩恢复摘要",
-        "",
-        f"- 当前项目：{_fmt_project_line(project)}",
-    ]
-    if project.get("test_command"):
-        lines.append(f"- 验证命令：`{project['test_command']}`")
-    spec_names = [SPEC_LABELS.get(c, c) for c, _ in specs]
-    if spec_names:
-        lines.append(f"- 项目规范：{ '、'.join(spec_names) }（完整内容见 .keystone/specs/，需遵守）")
-    if task is not None:
-        status = task.get("status", "TODO")
-        lines += [
-            f"- 当前任务：{task.get('code')} {task.get('title', '')}（{status}）",
-            f"- 阶段要求：{policy.STAGE_REQUIREMENTS.get(status, '')}",
-        ]
-        criteria = task.get("acceptance_criteria") or []
-        if criteria:
-            lines.append("- 验收标准：" + "；".join(criteria))
-    else:
-        lines.append("- 当前任务：无（会话未绑定任务）")
-    lines += ["", "</keystone-context>"]
-    return "\n".join(lines)

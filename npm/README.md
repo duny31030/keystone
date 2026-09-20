@@ -26,7 +26,7 @@ HookOutput JSON → stdout，退出码 0
 ├── project.json              # git：项目标识、语言/框架、构建/测试命令、stop_mode、policy_mode
 ├── specs/                    # git：architecture.md / coding.md / general-ban.md（规范即文件，PR 评审）
 ├── tasks/TASK-001/           # git：task.json（状态机）+ prd.md（任务描述）
-└── .state/                   # gitignored：会话绑定、元数据事件日志
+└── .state/                   # gitignored：会话绑定、SessionEnd 元数据日志
 ```
 
 共享层随 git 走（版本化、可评审、多人合并）；运行时状态不进仓库。
@@ -34,15 +34,17 @@ HookOutput JSON → stdout，退出码 0
 ## 安装
 
 ```bash
-# 正式发布后
-pip install keystone-hook
+# npm（Node 垫片 + 内嵌 Python 源码，无需 pip 依赖）
+npm install -g keystone-hook
 
-# 当前仅在 TestPyPI（测试站）
+# PyPI（TestPyPI 测试站）
 pip install --index-url https://test.pypi.org/simple/ keystone-hook
 
 # 仓库内开发安装（Python ≥ 3.9，运行时零依赖）
 pip install -e .
 ```
+
+两种安装方式提供同一套 CLI 行为：npm 包内嵌同一份 Python 源码，由 Node 垫片定位 `python3` 执行（仍需要 Python >= 3.9，但无需再通过 pip 安装 Keystone；可用 `KEYSTONE_PYTHON` 指定解释器）。npm 装的包发布新版本后用 `npm update -g keystone-hook` 升级。
 
 ## 快速上手
 
@@ -57,7 +59,7 @@ keystone task create "实现登录" -d "手机号+验证码登录" -a "接口通
 - **会话开始**：自动注入项目技术栈、构建/测试命令与规范；
 - **每次提交 prompt**：自动注入当前任务的描述、验收标准和阶段要求；首次会登记"待确认任务"（不会根据自然语言自动创建正式任务）；
 - **计划确认前**（TODO/PLANNING）：写文件类工具被拦截，直到 `keystone task advance` 推进到 PLAN_CONFIRMED；
-- **结束前**：注入完成检查清单（`stop_mode: enforce` 时未完成任务会直接阻止结束）。
+- **结束前**：`Stop` reminder 路径会注入完成检查清单；在 CodeBuddy 中已实测。
 
 ## 任务状态机
 
@@ -76,25 +78,27 @@ keystone task complete TASK-001         # VERIFYING → COMPLETED
 keystone task reopen TASK-001           # COMPLETED → IMPLEMENTING
 ```
 
-## Hook 事件
+## CodeBuddy 已验证 Hook
 
-| 事件 | 行为 |
+下列默认 hooks 已在真实 CodeBuddy 会话中验证；`keystone init` 只注册这些事件。
+
+| 事件 | 已验证行为 |
 |---|---|
-| `SessionStart` | 注入项目资料 + 规范 + 禁止事项 |
-| `UserPromptSubmit` | 解析会话绑定任务（支持 `TASK-123` / `#123` 编号切换），注入任务上下文与阶段要求 |
-| `PreToolUse` | 流程控制：计划确认前禁止写文件、完成任务后禁止继续修改、保护 `.keystone` 状态文件不被 AI 直接改写 |
-| `PostToolUse` | 记录元数据事件（工具名/成败/时间），不记录任何内容 |
-| `Stop` | 注入完成检查清单；enforce 模式阻止未完成任务结束；`stop_hook_active` 防循环 |
-| `SessionEnd` | 记录会话结束元数据 |
-| `PreCompact` | 上下文压缩前恢复关键信息（项目、任务、阶段、验收标准、验证命令） |
+| `SessionStart` | 注入项目资料、规范与禁止事项 |
+| `UserPromptSubmit` | 解析会话绑定任务（支持 `TASK-123` / `#123` 切换），注入任务上下文与阶段要求 |
+| `PreToolUse` | 计划确认前真实拒绝写入；任务完成后拒绝继续修改；保护 `.keystone` 状态文件 |
+| `Stop` | `reminder` 模式注入完成检查清单 |
+| `SessionEnd` | 记录会话级元数据（结束时间、原因、session ID、当前任务）到 `.keystone/.state/events.jsonl` |
 
-异常原则：**控制类 Hook fail-open，记录类 Hook fail-silent** —— Keystone 出任何问题都不影响 CodeBuddy 正常使用。未初始化 `.keystone/` 的项目完全零打扰。
+`stop_mode: enforce` 的 block 输出和 `stop_hook_active` 循环保护已通过本地协议测试，但尚待 CodeBuddy 实机验证。`PostToolUse` 与 `PreCompact` 未在当前 CodeBuddy 版本确认，因此 0.1.1 起不再默认注册或公开为可用能力。
+
+异常原则：**控制类 Hook fail-open，记录类 fail-silent** —— Keystone 出任何问题都不影响 CodeBuddy 正常使用。未初始化 `.keystone/` 的项目完全零打扰。
 
 ## 配置项（`.keystone/project.json`）
 
 | 字段 | 说明 | 默认 |
 |---|---|---|
-| `stop_mode` | `reminder` 仅提醒 / `enforce` 未完成阻止结束 | `reminder` |
+| `stop_mode` | `reminder` 注入检查清单（已实测）/ `enforce` 返回 block 输出（待 CodeBuddy 实测） | `reminder` |
 | `policy_mode` | `permissive` / `strict`（strict 下未绑定任务也禁止写文件） | `permissive` |
 | `test_command` / `build_command` | 注入给 AI 的验证/构建命令 | 按语言预设 |
 

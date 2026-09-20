@@ -71,14 +71,16 @@ def test_session_binding_roundtrip(layout):
     assert sessions.get_binding(layout, "s2") == "TASK-002"
 
 
-def test_events_append_metadata_only(layout):
-    sessions.append_event(layout, {"event": "PostToolUse", "tool_name": "Edit",
-                                   "success": True, "session_id": "s1", "task": "TASK-001"})
-    sessions.append_event(layout, {"event": "SessionEnd", "reason": "clear",
-                                   "session_id": "s1", "task": None})
+def test_session_end_event_append_metadata(layout):
+    sessions.append_event(
+        layout,
+        {"event": "SessionEnd", "reason": "clear", "session_id": "s1", "task": "TASK-001"},
+    )
     lines = layout.events_jsonl.read_text(encoding="utf-8").strip().splitlines()
-    assert len(lines) == 2
-    first = json.loads(lines[0])
-    assert first["event"] == "PostToolUse"
-    assert first["tool_name"] == "Edit"
-    assert "at" in first
+    assert len(lines) == 1
+    event = json.loads(lines[0])
+    assert event["event"] == "SessionEnd"
+    assert event["reason"] == "clear"
+    assert event["session_id"] == "s1"
+    assert event["task"] == "TASK-001"
+    assert "at" in event

@@ -1,3 +1,3 @@
 #!/usr/bin/env node
 'use strict';
-require('./_run').run('keystone.hook', 0);
+process.exit(require('./_run').run('keystone.hook', 0));

@@ -71,18 +71,3 @@ def test_stop_checklist_items():
     assert "验证结果" in text
     assert "pytest" in text
     assert "推进到 COMPLETED" in text
-
-
-def test_pre_compact_condensed():
-    task = {"code": "TASK-002", "title": "y", "status": "IMPLEMENTING",
-            "acceptance_criteria": ["c2"], "description_md": ""}
-    text = context.render_pre_compact(make_project_dict(), task, SPECS)
-    assert "压缩恢复" in text
-    assert "TASK-002" in text
-    assert "验收标准：c2" in text
-    assert "架构规范" in text
-
-
-def test_pre_compact_without_task():
-    text = context.render_pre_compact(make_project_dict(), None, [])
-    assert "会话未绑定任务" in text

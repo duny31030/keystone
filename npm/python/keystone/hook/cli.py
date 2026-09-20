@@ -16,23 +16,19 @@ EVENT_ALIASES = {
     "session-start": "SessionStart",
     "user-prompt-submit": "UserPromptSubmit",
     "pre-tool-use": "PreToolUse",
-    "post-tool-use": "PostToolUse",
     "stop": "Stop",
     "session-end": "SessionEnd",
-    "pre-compact": "PreCompact",
 }
 
 EVENT_HANDLERS = {
     "SessionStart": events.session_start,
     "UserPromptSubmit": events.user_prompt_submit,
     "PreToolUse": events.pre_tool_use,
-    "PostToolUse": events.post_tool_use,
     "Stop": events.stop,
     "SessionEnd": events.session_end,
-    "PreCompact": events.pre_compact,
 }
 
-USAGE = "usage: keystone-hook <session-start|user-prompt-submit|pre-tool-use|post-tool-use|stop|session-end|pre-compact>"
+USAGE = "usage: keystone-hook <session-start|user-prompt-submit|pre-tool-use|stop|session-end>"
 
 
 def resolve_event(name: str) -> str | None:

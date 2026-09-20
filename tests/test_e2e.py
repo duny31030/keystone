@@ -62,15 +62,7 @@ def test_full_session_scenario(tmp_path, monkeypatch, capsys):
                       monkeypatch, capsys)
     assert code == 0 and out is None
 
-    # 7. 工具调用事件被记录（仅元数据）
-    _hook(tmp_path, "post-tool-use",
-          {"cwd": str(tmp_path), "session_id": "s1", "tool_name": "Edit",
-           "tool_response": {"is_error": False}}, monkeypatch, capsys)
-    event = json.loads(KeystoneLayout(tmp_path).events_jsonl.read_text("utf-8").splitlines()[-1])
-    assert event == {"at": event["at"], "event": "PostToolUse", "tool_name": "Edit",
-                     "success": True, "session_id": "s1", "task": "TASK-001"}
-
-    # 8. 开启强制模式，VERIFYING 阶段 Stop → block
+    # 7. 开启强制模式，VERIFYING 阶段 Stop → block
     project["stop_mode"] = "enforce"
     save_project(KeystoneLayout(tmp_path), project)
     tasks.transition_task(KeystoneLayout(tmp_path), "TASK-001", "VERIFYING")
@@ -78,7 +70,7 @@ def test_full_session_scenario(tmp_path, monkeypatch, capsys):
                       monkeypatch, capsys)
     assert out["decision"] == "block"
 
-    # 9. 完成任务 → Stop 放行（reminder 文案），stop_hook_active 防循环依旧生效
+    # 8. 完成任务 → Stop 放行（reminder 文案），stop_hook_active 防循环依旧生效
     assert keystone_main(["task", "complete", "TASK-001"]) == 0
     capsys.readouterr()
     code, out = _hook(tmp_path, "stop", {"cwd": str(tmp_path), "session_id": "s1"},
@@ -89,15 +81,16 @@ def test_full_session_scenario(tmp_path, monkeypatch, capsys):
                       monkeypatch, capsys)
     assert code == 0 and out is None
 
-    # 10. 压缩前恢复上下文
-    code, out = _hook(tmp_path, "pre-compact",
-                      {"cwd": str(tmp_path), "session_id": "s1"}, monkeypatch, capsys)
-    assert "TASK-001" in out["hookSpecificOutput"]["additionalContext"]
-
-    # 11. 会话结束：仅记录
+    # 9. 会话结束：记录绑定任务与结束原因
     code, out = _hook(tmp_path, "session-end",
                       {"cwd": str(tmp_path), "session_id": "s1", "reason": "clear"},
                       monkeypatch, capsys)
     assert code == 0 and out is None
     last = json.loads(KeystoneLayout(tmp_path).events_jsonl.read_text("utf-8").splitlines()[-1])
-    assert last["event"] == "SessionEnd" and last["reason"] == "clear"
+    assert last == {
+        "at": last["at"],
+        "event": "SessionEnd",
+        "reason": "clear",
+        "session_id": "s1",
+        "task": "TASK-001",
+    }

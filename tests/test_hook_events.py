@@ -157,30 +157,22 @@ def test_pre_tool_use_strict_denies_when_no_task(layout):
     assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
-def test_post_tool_use_records_metadata_only(layout):
+def test_session_end_records_reason_and_bound_task(layout):
     tasks.create_task(layout, "A")
     sessions.bind_session(layout, "sess-1", "TASK-001")
-    fields = make_fields(
-        tool_name="Edit",
-        tool_input={"file_path": "/secret/a.py", "old_string": "机密内容"},
-        tool_response={"is_error": False},
-        raw={},
-    )
-    assert events.post_tool_use(fields, layout) is None
-    event = json.loads(layout.events_jsonl.read_text(encoding="utf-8").splitlines()[0])
-    assert event["tool_name"] == "Edit"
-    assert event["success"] is True
-    assert event["task"] == "TASK-001"
-    # 不包含内容类字段
-    assert "old_string" not in json.dumps(event)
-    assert "file_path" not in json.dumps(event)
-
-
-def test_session_end_records_reason(layout):
     assert events.session_end(make_fields(reason="clear"), layout) is None
     event = json.loads(layout.events_jsonl.read_text(encoding="utf-8").splitlines()[0])
     assert event["event"] == "SessionEnd"
     assert event["reason"] == "clear"
+    assert event["session_id"] == "sess-1"
+    assert event["task"] == "TASK-001"
+    assert "at" in event
+
+
+def test_session_end_uses_unknown_reason_when_missing(layout):
+    assert events.session_end(make_fields(), layout) is None
+    event = json.loads(layout.events_jsonl.read_text(encoding="utf-8").splitlines()[0])
+    assert event["reason"] == "unknown"
 
 
 def test_stop_reminder_mode(layout):
@@ -225,11 +217,3 @@ def test_stop_loop_guard(layout):
 
 def test_stop_without_task_is_silent(layout):
     assert events.stop(make_fields(), layout) is None
-
-
-def test_pre_compact_injects_summary(layout):
-    t = tasks.create_task(layout, "A", acceptance_criteria=["c1"])
-    sessions.bind_session(layout, "sess-1", t["code"])
-    out = events.pre_compact(make_fields(), layout)
-    ctx = out["hookSpecificOutput"]["additionalContext"]
-    assert "TASK-001" in ctx and "c1" in ctx

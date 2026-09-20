@@ -50,6 +50,11 @@ def test_empty_stdin_fails_open(project_dir, monkeypatch, capsys):
     assert capsys.readouterr().out.strip() == ""
 
 
+def test_retired_events_are_not_public_commands(project_dir, capsys):
+    assert hook_cli.main(["post-tool-use"]) == 1
+    assert hook_cli.main(["pre-compact"]) == 1
+
+
 def test_unknown_event_exits_nonzero(project_dir, capsys):
     assert hook_cli.main(["no-such-event"]) == 1
     assert hook_cli.main([]) == 1

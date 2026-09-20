@@ -1,4 +1,4 @@
-"""七个 hook 事件的处理逻辑。
+"""已在 CodeBuddy 中验证的 hook 事件处理逻辑。
 
 handler 约定：接收 (fields, layout)，返回输出 dict 或 None（None = 不输出、
 合法 no-op）。异常由分发器统一兜底：控制类 fail-open、记录类 fail-silent，
@@ -149,35 +149,6 @@ def _is_keystone_internal(target: Path, layout: KeystoneLayout) -> bool:
     return parts[0] == "tasks" and parts[-1] == "task.json"
 
 
-def post_tool_use(fields: dict, layout: KeystoneLayout) -> dict | None:
-    """记录元数据事件：工具名/成败/会话/任务/时间。绝不记录内容类信息。"""
-    session_id = fields["session_id"]
-    sessions.append_event(
-        layout,
-        {
-            "event": "PostToolUse",
-            "tool_name": fields["tool_name"],
-            "success": _derive_success(fields),
-            "session_id": session_id,
-            "task": sessions.get_binding(layout, session_id) if session_id else None,
-        },
-    )
-    return None
-
-
-def _derive_success(fields: dict):
-    explicit = fields["raw"].get("success")
-    if isinstance(explicit, bool):
-        return explicit
-    response = fields["tool_response"]
-    if isinstance(response, dict):
-        if isinstance(response.get("is_error"), bool):
-            return not response["is_error"]
-        if isinstance(response.get("success"), bool):
-            return response["success"]
-    return None
-
-
 def stop(fields: dict, layout: KeystoneLayout) -> dict | None:
     """结束前检查。stop_hook_active 为真时立即放行，避免无限循环。"""
     if fields["stop_hook_active"]:
@@ -207,13 +178,3 @@ def session_end(fields: dict, layout: KeystoneLayout) -> dict | None:
         },
     )
     return None
-
-
-def pre_compact(fields: dict, layout: KeystoneLayout) -> dict | None:
-    """上下文压缩前恢复关键信息。"""
-    project = load_project(layout)
-    session_id = fields["session_id"]
-    bound = sessions.get_binding(layout, session_id) if session_id else None
-    task = tasks.find_task(layout, bound) if bound else None
-    text = context.render_pre_compact(project, task, specs.load_specs(layout))
-    return output.additional_context("PreCompact", text)

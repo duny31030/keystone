@@ -68,13 +68,63 @@ def test_init_idempotent_no_duplicate_hooks(tmp_path, capsys):
     assert gitignore.count(".keystone/.state/") == 1
 
 
+def test_default_hooks_are_exactly_the_verified_codebuddy_events():
+    hooks = scaffold.build_hooks_block("keystone-hook")
+    assert set(hooks) == {
+        "SessionStart",
+        "UserPromptSubmit",
+        "PreToolUse",
+        "Stop",
+        "SessionEnd",
+    }
+    assert "PostToolUse" not in hooks
+    assert "PreCompact" not in hooks
+    assert [rule["matcher"] for rule in hooks["SessionStart"]] == [
+        "startup",
+        "clear",
+        "compact",
+    ]
+    assert hooks["PreToolUse"][0]["matcher"] == scaffold.TOOL_MATCHER
+    for event in ("UserPromptSubmit", "Stop", "SessionEnd"):
+        assert "matcher" not in hooks[event][0]
+
+
+def test_merge_settings_removes_retired_keystone_rules_only():
+    existing = {
+        "hooks": {
+            "PostToolUse": [
+                {"hooks": [{"command": "keystone-hook post-tool-use"}]},
+                {"hooks": [{"command": "other-tool post-tool-use"}]},
+            ],
+            "PreCompact": [
+                {"hooks": [{"command": "python3 -m keystone.hook pre-compact"}]},
+                {"hooks": [{"command": "trellis pre-compact"}]},
+            ],
+        }
+    }
+    merged = scaffold.merge_settings(existing, "keystone-hook")
+    hooks = merged["hooks"]
+    assert hooks["PostToolUse"] == [{"hooks": [{"command": "other-tool post-tool-use"}]}]
+    assert hooks["PreCompact"] == [{"hooks": [{"command": "trellis pre-compact"}]}]
+
+
+def test_merge_settings_removes_empty_retired_events():
+    existing = {
+        "hooks": {
+            "PostToolUse": [{"hooks": [{"command": "keystone-hook post-tool-use"}]}],
+            "PreCompact": [{"hooks": [{"command": "keystone-hook pre-compact"}]}],
+        }
+    }
+    merged = scaffold.merge_settings(existing, "keystone-hook")
+    assert "PostToolUse" not in merged["hooks"]
+    assert "PreCompact" not in merged["hooks"]
+
+
 def test_merge_settings_unit():
     existing = {"hooks": {"Stop": [{"hooks": [{"command": "other-tool stop"}]}]}}
     merged = scaffold.merge_settings(existing, "keystone-hook")
     assert merged["hooks"]["Stop"][0]["hooks"][0]["command"] == "other-tool stop"
     assert "keystone-hook stop" in merged["hooks"]["Stop"][1]["hooks"][0]["command"]
-    # SessionStart 三 matcher
-    assert [r["matcher"] for r in merged["hooks"]["SessionStart"]] == ["startup", "clear", "compact"]
 
 
 def _run_task(argv, capsys):

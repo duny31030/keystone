@@ -14,12 +14,16 @@ from keystone.store.project import save_project
 from keystone.store.specs import write_templates as write_spec_templates
 from keystone.util import atomic_write_json
 
-# PreToolUse / PostToolUse 的 matcher：写类与执行类工具的宽松 alternation
+# PreToolUse 的 matcher：写类与执行类工具的宽松 alternation
 TOOL_MATCHER = (
     "Write|Edit|MultiEdit|NotebookEdit|write_to_file|replace_in_file|apply_patch|"
     "str_replace_editor|str_replace_based_edit_tool|create_file|edit_file|save_file|"
     "Bash|execute_command|run_command|run_terminal_cmd|terminal|shell"
 )
+
+# 真实 CodeBuddy 验证未确认的旧版默认注册。重跑 init 时只清理 Keystone
+# 自己的规则，绝不影响同一事件下的用户或其他工具 hook。
+RETIRED_EVENTS = ("PostToolUse", "PreCompact")
 
 _HOOK_TIMEOUT = 15
 
@@ -31,7 +35,7 @@ def _render_command(prefix: str, event: str) -> str:
 
 
 def build_hooks_block(prefix: str) -> dict:
-    """CodeBuddy hooks 注册块（PascalCase 事件名，CodeBuddy 未支持的事件不会触发、无害）。"""
+    """已在真实 CodeBuddy 中验证的默认 hooks 注册块。"""
 
     def rule(event: str) -> dict:
         return {
@@ -47,10 +51,8 @@ def build_hooks_block(prefix: str) -> dict:
         ],
         "UserPromptSubmit": [{"hooks": [rule("user-prompt-submit")]}],
         "PreToolUse": [{"matcher": TOOL_MATCHER, "hooks": [rule("pre-tool-use")]}],
-        "PostToolUse": [{"matcher": TOOL_MATCHER, "hooks": [rule("post-tool-use")]}],
         "Stop": [{"hooks": [rule("stop")]}],
         "SessionEnd": [{"hooks": [rule("session-end")]}],
-        "PreCompact": [{"hooks": [rule("pre-compact")]}],
     }
 
 
@@ -61,12 +63,22 @@ def _is_keystone_rule(rule: dict) -> bool:
 
 
 def merge_settings(existing: dict | None, prefix: str) -> dict:
-    """把 keystone 的 hooks 合入既有 settings（先移除旧 keystone 条目再追加）。"""
+    """合入已验证 hooks，并清理旧 Keystone 的退役事件注册。"""
     ours = build_hooks_block(prefix)
     merged = json.loads(json.dumps(existing)) if existing else {}
     hooks = merged.setdefault("hooks", {})
+
+    for event in RETIRED_EVENTS:
+        if event not in hooks:
+            continue
+        kept = [rule for rule in hooks[event] if not _is_keystone_rule(rule)]
+        if kept:
+            hooks[event] = kept
+        else:
+            del hooks[event]
+
     for event, rules in ours.items():
-        kept = [r for r in hooks.get(event, []) if not _is_keystone_rule(r)]
+        kept = [rule for rule in hooks.get(event, []) if not _is_keystone_rule(rule)]
         hooks[event] = kept + rules
     return merged
 
