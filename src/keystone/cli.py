@@ -137,6 +137,29 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         totals[level] += 1
         print(f"{level:4} {name:12} {detail}")
     print(f"\n{totals['PASS']} pass, {totals['WARN']} warn, {totals['FAIL']} fail")
+
+    if not args.fix:
+        return 1 if totals["FAIL"] else 0
+
+    # --fix 模式：尝试修复可安全修复的问题
+    from keystone.inspection import doctor_fix
+    fixed = doctor_fix(target, args.hook_command)
+    if not fixed:
+        print("\n· 无可修复的问题")
+        return 1 if totals["FAIL"] else 0
+
+    print("\n已修复：")
+    for item in fixed:
+        print(f"  ✓ {item}")
+
+    # 修复后重新运行 doctor
+    print("\n修复后重新检查：")
+    findings = doctor_findings(target)
+    totals = {level: 0 for level in ("PASS", "WARN", "FAIL")}
+    for level, name, detail in findings:
+        totals[level] += 1
+        print(f"{level:4} {name:12} {detail}")
+    print(f"\n{totals['PASS']} pass, {totals['WARN']} warn, {totals['FAIL']} fail")
     return 1 if totals["FAIL"] else 0
 
 
@@ -287,9 +310,13 @@ def build_parser() -> argparse.ArgumentParser:
                         help="非交互模式：缺失信息一律用默认值")
     p_init.add_argument("--dry-run", action="store_true", help="预览将要创建或更新的文件，不写入")
 
-    for name, handler_help in (("status", "显示项目、任务和本地注册摘要"), ("doctor", "检查本地 Keystone 配置健康状态")):
-        command = sub.add_parser(name, help=handler_help)
-        command.add_argument("--dir", default=".", help="项目目录（默认当前目录，可从子目录向上定位）")
+    p_status = sub.add_parser("status", help="显示项目、任务和本地注册摘要")
+    p_status.add_argument("--dir", default=".", help="项目目录（默认当前目录，可从子目录向上定位）")
+
+    p_doctor = sub.add_parser("doctor", help="检查本地 Keystone 配置健康状态")
+    p_doctor.add_argument("--dir", default=".", help="项目目录（默认当前目录，可从子目录向上定位）")
+    p_doctor.add_argument("--fix", action="store_true", help="自动修复可安全修复的问题")
+    p_doctor.add_argument("--hook-command", default="keystone-hook", help="hook 注册的命令前缀")
 
     p_uninstall = sub.add_parser("uninstall", help="移除 Keystone Hook 注册")
     p_uninstall.add_argument("--dir", default=".", help="目标项目目录（默认当前目录）")

@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from keystone.core.statemachine import STATUSES
-from keystone.scaffold import EXPECTED_EVENTS, RETIRED_EVENTS, _is_keystone_command
+from keystone.scaffold import EXPECTED_EVENTS, RETIRED_EVENTS, _is_keystone_command, build_hooks_block, merge_settings, remove_keystone_settings
 from keystone.store.layout import CODEBUDDY_SETTINGS, KeystoneLayout, find_layout
-from keystone.store.specs import SPEC_CATEGORIES
+from keystone.store.specs import SPEC_CATEGORIES, write_templates as write_spec_templates
 
 
 @dataclass(frozen=True)
@@ -116,3 +116,52 @@ def doctor_findings(target: Path) -> list[tuple[str, str, str]]:
     if sessions.state not in ("missing", "ok"):
         findings.append(("WARN", "sessions", f"sessions.json {sessions.state}"))
     return findings
+
+
+def doctor_fix(target: Path, prefix: str = "keystone-hook") -> list[str]:
+    """自动修复 doctor 发现的可安全修复问题，返回修复动作列表。"""
+    from keystone.util import atomic_write_json
+    from keystone.scaffold import GITIGNORE_BLOCK, GITIGNORE_ENTRY, GITIGNORE_MARKER
+
+    info = inspect_project(target)
+    layout = info["layout"]
+    if layout is None:
+        return []
+    fixed: list[str] = []
+
+    # 修复 settings.json：补齐缺失的 hook 注册，清理退役条目
+    settings_path = layout.root / CODEBUDDY_SETTINGS
+    settings_view = info["settings"]
+    if settings_view.state == "missing" or settings_view.state == "ok":
+        existing = settings_view.value if settings_view.state == "ok" else None
+        merged = merge_settings(existing, prefix)
+        if existing != merged:
+            atomic_write_json(settings_path, merged)
+            fixed.append(f"更新 {settings_path.name}（补齐/清理 Keystone hook 注册）")
+
+    # 修复 .gitignore：补 managed block
+    gitignore_path = layout.root / ".gitignore"
+    if gitignore_path.is_file():
+        content = gitignore_path.read_text(encoding="utf-8")
+        if GITIGNORE_ENTRY not in content:
+            if content and not content.endswith("\n"):
+                content += "\n"
+            content += "\n" + GITIGNORE_BLOCK
+            gitignore_path.write_text(content, encoding="utf-8")
+            fixed.append("补 .gitignore 的 .keystone/.state/ 忽略项")
+    else:
+        gitignore_path.write_text(GITIGNORE_BLOCK, encoding="utf-8")
+        fixed.append("创建 .gitignore 并添加 .keystone/.state/ 忽略项")
+
+    # 修复 .keystone/ 目录结构：创建缺失的目录
+    for directory in (layout.tasks_dir, layout.state_dir):
+        if not directory.is_dir():
+            directory.mkdir(parents=True, exist_ok=True)
+            fixed.append(f"创建目录 {directory.relative_to(layout.root)}")
+
+    # 修复规范模板：生成缺失的模板文件
+    created_specs = write_spec_templates(layout)
+    for path in created_specs:
+        fixed.append(f"生成规范模板 {path.relative_to(layout.root)}")
+
+    return fixed

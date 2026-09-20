@@ -73,6 +73,9 @@ keystone status
 # 检查本地文件、settings 注册与可修复配置问题
 keystone doctor
 
+# 自动修复可安全修复的问题（补齐缺失的 Hook 注册、清理退役条目、补 gitignore、创建缺失目录和规范模板）
+keystone doctor --fix
+
 # 只注销 Keystone hooks，保留 .keystone/ 任务、规范和其他工具配置
 keystone uninstall
 
@@ -83,7 +86,7 @@ keystone uninstall --purge --dry-run
 keystone uninstall --purge --yes
 ```
 
-`doctor` 只检查磁盘上的项目配置和 `.codebuddy/settings.json` 的静态注册，不会声称 CodeBuddy 已加载或实际触发 Hook。`status` 是只读摘要；两者都不执行构建、测试或修改代码。
+`doctor` 只检查磁盘上的项目配置和 `.codebuddy/settings.json` 的静态注册，不会声称 CodeBuddy 已加载或实际触发 Hook。`doctor --fix` 自动修复可安全修复的问题：补齐缺失的五个已验证 Hook 注册、清理退役的 PostToolUse/PreCompact 条目、补 `.gitignore` 的 managed block、创建缺失的 `.keystone/` 目录结构和规范模板。**不修复**损坏的 JSON 文件或用户自定义内容。`status` 是只读摘要；两者都不执行构建、测试或修改代码。
 
 `uninstall` 从所有 CodeBuddy event 中移除 Keystone command，保留混合 rule 内的第三方 command、matcher 与 `.codebuddy/` 目录。默认保留 `.keystone/`；只有 `--purge --yes` 才会删除任务和规范，且只移除 Keystone 自己写入的 gitignore managed block。
 
