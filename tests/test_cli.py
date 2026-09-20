@@ -108,6 +108,26 @@ def test_merge_settings_removes_retired_keystone_rules_only():
     assert hooks["PreCompact"] == [{"hooks": [{"command": "trellis pre-compact"}]}]
 
 
+def test_merge_settings_preserves_third_party_command_in_mixed_rule():
+    existing = {
+        "hooks": {
+            "PostToolUse": [
+                {
+                    "matcher": "Edit",
+                    "hooks": [
+                        {"command": "keystone-hook post-tool-use"},
+                        {"command": "vendor-hook preserve-me"},
+                    ],
+                }
+            ]
+        }
+    }
+    merged = scaffold.merge_settings(existing, "keystone-hook")
+    assert merged["hooks"]["PostToolUse"] == [
+        {"matcher": "Edit", "hooks": [{"command": "vendor-hook preserve-me"}]}
+    ]
+
+
 def test_merge_settings_removes_empty_retired_events():
     existing = {
         "hooks": {

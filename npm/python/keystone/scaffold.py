@@ -56,10 +56,29 @@ def build_hooks_block(prefix: str) -> dict:
     }
 
 
-def _is_keystone_rule(rule: dict) -> bool:
-    return any(
-        "keystone" in str(h.get("command", "")) for h in rule.get("hooks", [])
-    )
+def _is_keystone_command(hook: object) -> bool:
+    return isinstance(hook, dict) and "keystone" in str(hook.get("command", ""))
+
+
+def _without_keystone_hooks(rule: object) -> dict | None:
+    """从一条规则中移除 Keystone commands，保留共存的第三方 commands。"""
+    if not isinstance(rule, dict):
+        return rule
+    command_hooks = rule.get("hooks")
+    if not isinstance(command_hooks, list):
+        return rule
+    kept_hooks = [hook for hook in command_hooks if not _is_keystone_command(hook)]
+    if not kept_hooks:
+        return None
+    retained = dict(rule)
+    retained["hooks"] = kept_hooks
+    return retained
+
+
+def _remove_keystone_hooks(rules: object) -> list:
+    if not isinstance(rules, list):
+        return []
+    return [retained for rule in rules if (retained := _without_keystone_hooks(rule)) is not None]
 
 
 def merge_settings(existing: dict | None, prefix: str) -> dict:
@@ -71,14 +90,14 @@ def merge_settings(existing: dict | None, prefix: str) -> dict:
     for event in RETIRED_EVENTS:
         if event not in hooks:
             continue
-        kept = [rule for rule in hooks[event] if not _is_keystone_rule(rule)]
+        kept = _remove_keystone_hooks(hooks[event])
         if kept:
             hooks[event] = kept
         else:
             del hooks[event]
 
     for event, rules in ours.items():
-        kept = [rule for rule in hooks.get(event, []) if not _is_keystone_rule(rule)]
+        kept = _remove_keystone_hooks(hooks.get(event, []))
         hooks[event] = kept + rules
     return merged
 
