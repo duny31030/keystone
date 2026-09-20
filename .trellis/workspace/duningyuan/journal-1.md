@@ -26,3 +26,24 @@
 ### Status
 
 [OK] **Completed**
+
+
+## Session 2: 验证并收敛 CodeBuddy Hook 兼容性
+
+**Date**: 2026-09-20
+**Task**: 验证并收敛 CodeBuddy Hook 兼容性
+**Branch**: `main`
+
+### Summary
+
+真实验证确认五个 CodeBuddy hooks；移除未验证的 PostToolUse/PreCompact 默认注册，迁移保留第三方混合 rules，修正 npm 退出码与打包字节码问题；68 个测试通过。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0687b01` | (see git log) |
+
+### Status
+
+[OK] **Completed**
