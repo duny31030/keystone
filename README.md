@@ -84,6 +84,11 @@ keystone uninstall --purge --dry-run
 
 # 确认删除 .keystone/ 项目资料（非交互环境必须显式 --yes）
 keystone uninstall --purge --yes
+
+# 查看本地 SessionEnd 事件记录（可按任务/会话/事件类型过滤）
+keystone events list
+keystone events list --task TASK-001
+keystone events list --session <id>
 ```
 
 `doctor` 只检查磁盘上的项目配置和 `.codebuddy/settings.json` 的静态注册，不会声称 CodeBuddy 已加载或实际触发 Hook。`doctor --fix` 自动修复可安全修复的问题：补齐缺失的五个已验证 Hook 注册、清理退役的 PostToolUse/PreCompact 条目、补 `.gitignore` 的 managed block、创建缺失的 `.keystone/` 目录结构和规范模板。**不修复**损坏的 JSON 文件或用户自定义内容。`status` 是只读摘要；两者都不执行构建、测试或修改代码。

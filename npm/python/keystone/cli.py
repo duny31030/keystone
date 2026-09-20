@@ -202,6 +202,52 @@ def _require_layout():
     return layout
 
 
+def cmd_events(args: argparse.Namespace) -> int:
+    target = Path(args.dir).expanduser().resolve()
+    layout = find_layout(target)
+    if layout is None:
+        print("keystone: 当前目录不是 keystone 项目（未找到 .keystone/）", file=sys.stderr)
+        return 1
+
+    events_path = layout.events_jsonl
+    if not events_path.is_file():
+        print("（暂无事件记录）")
+        return 0
+
+    lines = events_path.read_text(encoding="utf-8").strip().splitlines()
+    events = []
+    for line in lines:
+        try:
+            event = json.loads(line)
+            events.append(event)
+        except json.JSONDecodeError:
+            continue  # 跳过损坏行
+
+    # 过滤
+    if args.task:
+        events = [e for e in events if e.get("task") == args.task]
+    if args.session:
+        events = [e for e in events if e.get("session_id") == args.session]
+    if args.event:
+        events = [e for e in events if e.get("event") == args.event]
+
+    if not events:
+        print("（暂无匹配的事件记录）")
+        return 0
+
+    # 表头
+    print(f"{'时间':<20} {'事件':<15} {'会话':<40} {'任务':<10} {'原因':<15}")
+    print("-" * 100)
+    for e in events:
+        at = e.get("at", "?")
+        event = e.get("event", "?")
+        session = e.get("session_id", "?")[:38]
+        task = e.get("task") or "-"
+        reason = e.get("reason", "-")
+        print(f"{at:<20} {event:<15} {session:<40} {task:<10} {reason:<15}")
+    return 0
+
+
 def cmd_task(args: argparse.Namespace) -> int:
     layout = _require_layout()
     try:
@@ -324,6 +370,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_uninstall.add_argument("--purge", action="store_true", help="同时删除 .keystone/ 项目资料")
     p_uninstall.add_argument("-y", "--yes", action="store_true", help="确认 --purge（非交互环境必需）")
 
+    p_events = sub.add_parser("events", help="查看本地事件记录")
+    p_events.add_argument("--dir", default=".", help="项目目录（默认当前目录）")
+    p_events.add_argument("--task", default=None, help="按任务过滤（如 TASK-001）")
+    p_events.add_argument("--session", default=None, help="按会话 ID 过滤")
+    p_events.add_argument("--event", default=None, help="按事件类型过滤（如 SessionEnd）")
+
     p_task = sub.add_parser("task", help="任务管理")
     task_sub = p_task.add_subparsers(dest="task_command", required=True)
 
@@ -371,6 +423,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_doctor(args)
     if args.command == "uninstall":
         return cmd_uninstall(args)
+    if args.command == "events":
+        return cmd_events(args)
     return 1
 
 
