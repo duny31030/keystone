@@ -7,12 +7,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 from keystone import scaffold
 from keystone.core import statemachine
 from keystone.errors import KeystoneError
+from keystone.inspection import doctor_findings, hook_commands, inspect_project
 from keystone.store import tasks as task_store
 from keystone.store.layout import find_layout
 from keystone.store.project import make_project
@@ -26,54 +28,145 @@ def _interactive_default(prompt: str, default: str, enabled: bool = True) -> str
     return default
 
 
+def _render_plan(title: str, changes) -> None:
+    print(f"{title}:")
+    for change in changes:
+        try:
+            path = change.path.relative_to(change.path.parents[len(change.path.parents) - 1])
+        except ValueError:
+            path = change.path
+        print(f"{change.action:9} {change.path}")
+        if change.diff:
+            print(change.diff.rstrip())
+
+
 def cmd_init(args: argparse.Namespace) -> int:
     target = Path(args.dir).expanduser().resolve()
     if not target.is_dir():
         print(f"keystone init: 目录不存在：{target}", file=sys.stderr)
         return 1
-
-    interactive = not args.yes
-    detected = scaffold.detect_language(target)
-    language = args.lang
-    if language is None:
-        language = detected or _interactive_default("项目语言 (java/python)", "python", interactive)
+    interactive = not args.yes and not args.dry_run
+    language = args.lang or scaffold.detect_language(target) or _interactive_default("项目语言 (java/python)", "python", interactive)
     if language not in ("java", "python"):
         print(f"keystone init: 暂不支持语言 {language!r}（P0 支持 java / python）", file=sys.stderr)
         return 1
-
-    default_name = target.name
-    name = args.name or _interactive_default("项目名称", default_name, interactive)
-
+    name = args.name or _interactive_default("项目名称", target.name, interactive)
     project = make_project(
-        slug=name.lower().replace("_", "-"),
-        name=name,
-        language=language,
-        framework=args.framework,
-        build_tool=args.build_tool,
-        build_command=args.build_command,
-        test_command=args.test_command,
-        stop_mode=args.stop_mode,
-        policy_mode=args.policy_mode,
+        slug=name.lower().replace("_", "-"), name=name, language=language,
+        framework=args.framework, build_tool=args.build_tool,
+        build_command=args.build_command, test_command=args.test_command,
+        stop_mode=args.stop_mode, policy_mode=args.policy_mode,
     )
-
-    layout, created = scaffold.scaffold_keystone(target, project)
-    if not created:
-        print(f"keystone init: {layout.dir} 已存在，保留现有配置（project.json 未改动）")
-
-    settings_path, existed = scaffold.write_codebuddy_settings(target, args.hook_command)
-    gitignore_changed = scaffold.ensure_gitignore(target)
-
-    print(f"✓ 项目：{project['name']}（{project['language']}"
-          f"{(' / ' + project['framework']) if project['framework'] else ''}）")
+    try:
+        plan = scaffold.plan_init(target, project, args.hook_command)
+    except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError) as exc:
+        print(f"keystone init: 无法读取现有配置：{exc}", file=sys.stderr)
+        return 1
+    if args.dry_run:
+        _render_plan(f"keystone init --dry-run: {target}", plan.changes)
+        print("不会写入文件。")
+        return 0
+    settings_path, settings_changed, gitignore_changed = scaffold.apply_init_plan(plan, project)
+    if not plan.creates_project:
+        print(f"keystone init: {plan.layout.dir} 已存在，保留现有配置（project.json 未改动）")
+    print(f"✓ 项目：{project['name']}（{project['language']}" + (f" / {project['framework']}" if project['framework'] else "") + "）")
     print(f"✓ 测试命令：{project['test_command'] or '（未配置）'}")
-    print(f"✓ 已生成 {layout.dir}" + ("" if created else "（已存在，未覆盖）"))
-    print(f"✓ 已{'更新' if existed else '创建'} {settings_path}（hook 命令：{args.hook_command} <event>）")
+    print(f"✓ 已生成 {plan.layout.dir}" + ("" if plan.creates_project else "（已存在，未覆盖）"))
+    print(f"✓ 已{'更新' if settings_changed else '检查'} {settings_path}（hook 命令：{args.hook_command} <event>）")
     print("✓ .gitignore 已追加 .keystone/.state/" if gitignore_changed else "· .gitignore 已包含忽略项，未改动")
-    print()
-    print("下一步：")
+    print("\n下一步：")
     print("  1. 编辑 .keystone/specs/ 下的规范文件（按项目实际填写）")
-    print(f"  2. keystone task create \"<任务标题>\" 创建第一个任务")
+    print("  2. keystone task create \"<任务标题>\" 创建第一个任务")
     print("  3. 在 CodeBuddy 中打开项目，hook 会在会话开始/提交 prompt 时自动注入上下文")
+    return 0
+
+
+def _target_layout(target: Path):
+    info = inspect_project(target)
+    layout = info["layout"]
+    if layout is None or info["project"].state != "ok":
+        print("keystone: 当前目录不是有效的 keystone 项目（未找到或无法读取 .keystone/project.json）。\n"
+              "先在项目根目录执行 keystone init。", file=sys.stderr)
+        return None, info
+    return layout, info
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    target = Path(args.dir).expanduser().resolve()
+    layout, info = _target_layout(target)
+    if layout is None:
+        return 1
+    project = info["project"].value
+    assert isinstance(project, dict)
+    if info["settings"].state not in ("missing", "ok"):
+        print("keystone status: .codebuddy/settings.json 无法读取；运行 keystone doctor 查看详情。", file=sys.stderr)
+        return 1
+    if info["sessions"].state not in ("missing", "ok"):
+        print("keystone status: .keystone/.state/sessions.json 无法读取；运行 keystone doctor 查看详情。", file=sys.stderr)
+        return 1
+    valid_tasks = [view.value for _, view in info["tasks"] if view.state == "ok" and isinstance(view.value, dict)]
+    counts = {status: sum(task.get("status") == status for task in valid_tasks) for status in statemachine.STATUSES}
+    pending = sum(bool(task.get("pending_confirmation")) for task in valid_tasks)
+    active = sum(task.get("status") != "COMPLETED" for task in valid_tasks)
+    registered = hook_commands(info["settings"].value) if info.get("settings") and info["settings"].state == "ok" else {}
+    session_count = len(info["sessions"].value) if info["sessions"].state == "ok" and isinstance(info["sessions"].value, dict) else 0
+    event_count = 0
+    if layout.events_jsonl.is_file():
+        try:
+            event_count = len([line for line in layout.events_jsonl.read_text(encoding="utf-8").splitlines() if line.strip()])
+        except OSError:
+            pass
+    print(f"Project: {project.get('name', '<unnamed>')}")
+    print(f"Root: {layout.root}")
+    print(f"Stack: {project.get('language', '?')} / {project.get('framework') or '-'} / {project.get('build_tool') or '-'}")
+    print(f"Policy: {project.get('policy_mode', '?')}    Stop: {project.get('stop_mode', '?')}")
+    print(f"Test command: {project.get('test_command') or '（未配置）'}")
+    print(f"\nTasks: {len(valid_tasks)} total, {active} active, {counts['COMPLETED']} completed, {pending} pending confirmation")
+    print("  " + "  ".join(f"{status}: {counts[status]}" for status in statemachine.STATUSES))
+    registered_events = sum(bool(registered.get(event)) for event in scaffold.EXPECTED_EVENTS)
+    print(f"Hooks: {registered_events}/{len(scaffold.EXPECTED_EVENTS)} verified event registrations in .codebuddy/settings.json")
+    print(f"Runtime: {session_count} session bindings, {event_count} SessionEnd records")
+    return 0
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    target = Path(args.dir).expanduser().resolve()
+    findings = doctor_findings(target)
+    totals = {level: 0 for level in ("PASS", "WARN", "FAIL")}
+    for level, name, detail in findings:
+        totals[level] += 1
+        print(f"{level:4} {name:12} {detail}")
+    print(f"\n{totals['PASS']} pass, {totals['WARN']} warn, {totals['FAIL']} fail")
+    return 1 if totals["FAIL"] else 0
+
+
+def cmd_uninstall(args: argparse.Namespace) -> int:
+    target = Path(args.dir).expanduser().resolve()
+    if not target.is_dir():
+        print(f"keystone uninstall: 目录不存在：{target}", file=sys.stderr)
+        return 1
+    if args.purge and not args.dry_run and not args.yes:
+        if not sys.stdin.isatty():
+            print("keystone uninstall: 非交互环境执行 --purge 必须同时传 --yes。", file=sys.stderr)
+            return 1
+        if input("将删除 .keystone/ 内的项目配置、规范、任务和运行态。继续？[y/N] ").strip().lower() not in {"y", "yes"}:
+            print("已取消。")
+            return 1
+    try:
+        plan = scaffold.plan_uninstall(target, args.purge)
+    except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError) as exc:
+        print(f"keystone uninstall: 无法读取现有配置：{exc}", file=sys.stderr)
+        return 1
+    if args.dry_run:
+        _render_plan(f"keystone uninstall --dry-run: {target}", plan.changes)
+        print("不会写入文件。")
+        return 0
+    scaffold.apply_uninstall_plan(plan)
+    changed = [change for change in plan.changes if change.action in {"UPDATE", "REMOVE"}]
+    if not changed:
+        print("· 未发现 Keystone 配置，未改动。")
+    else:
+        print("✓ 已移除 Keystone Hook 注册；.keystone/ 项目资料已保留。" if not args.purge else "✓ 已移除 Keystone 注册并删除 .keystone/ 项目资料。")
     return 0
 
 
@@ -183,6 +276,17 @@ def build_parser() -> argparse.ArgumentParser:
                         help="hook 注册的命令前缀（需包含 keystone 字样以便幂等合并），如 'python3 -m keystone.hook'")
     p_init.add_argument("-y", "--yes", action="store_true",
                         help="非交互模式：缺失信息一律用默认值")
+    p_init.add_argument("--dry-run", action="store_true", help="预览将要创建或更新的文件，不写入")
+
+    for name, handler_help in (("status", "显示项目、任务和本地注册摘要"), ("doctor", "检查本地 Keystone 配置健康状态")):
+        command = sub.add_parser(name, help=handler_help)
+        command.add_argument("--dir", default=".", help="项目目录（默认当前目录，可从子目录向上定位）")
+
+    p_uninstall = sub.add_parser("uninstall", help="移除 Keystone Hook 注册")
+    p_uninstall.add_argument("--dir", default=".", help="目标项目目录（默认当前目录）")
+    p_uninstall.add_argument("--dry-run", action="store_true", help="预览卸载变更，不写入")
+    p_uninstall.add_argument("--purge", action="store_true", help="同时删除 .keystone/ 项目资料")
+    p_uninstall.add_argument("-y", "--yes", action="store_true", help="确认 --purge（非交互环境必需）")
 
     p_task = sub.add_parser("task", help="任务管理")
     task_sub = p_task.add_subparsers(dest="task_command", required=True)
@@ -222,6 +326,12 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_init(args)
     if args.command == "task":
         return cmd_task(args)
+    if args.command == "status":
+        return cmd_status(args)
+    if args.command == "doctor":
+        return cmd_doctor(args)
+    if args.command == "uninstall":
+        return cmd_uninstall(args)
     return 1
 
 
