@@ -173,3 +173,24 @@ COMPLETED 写入拒绝、.keystone 状态保护、计划阶段拦截、Stop remi
 ### Status
 
 [OK] **Completed**
+
+
+## Session 9: 实现 Keystone workflow skills
+
+**Date**: 2026-10-03
+**Task**: 实现 Keystone workflow skills
+**Branch**: `main`
+
+### Summary
+
+增加 keystone-plan、keystone-verify、keystone-handoff canonical skills 和 skills list/install CLI；支持 auto/all/dry-run/冲突保护；Python/npm 资源打包验证通过，按要求未运行 pytest。
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a82ce85` | (see git log) |
+
+### Status
+
+[OK] **Completed**
