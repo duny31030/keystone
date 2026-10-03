@@ -1,6 +1,6 @@
 {
   "name": "keystone-hook",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Keystone: CodeBuddy 流程与上下文增强层（Hook Runner + 本地任务/规范管理）。纯标准库 Python 实现，经 Node 垫片启动。",
   "license": "MIT",
   "bin": {

@@ -6,6 +6,13 @@
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-03
+
+### Added
+- Keystone workflow skills: `keystone-plan`, `keystone-verify`, `keystone-handoff`
+- `keystone skills list` and `keystone skills install` with auto/all/platform targeting, dry-run, idempotency and collision protection
+- Canonical Skill resources included in Python wheel and npm tarball
+
 ## [0.2.0] - 2026-09-20
 
 ### Added

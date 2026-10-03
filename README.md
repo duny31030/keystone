@@ -95,6 +95,34 @@ keystone events list --session <id>
 
 `uninstall` 从所有 CodeBuddy event 中移除 Keystone command，保留混合 rule 内的第三方 command、matcher 与 `.codebuddy/` 目录。默认保留 `.keystone/`；只有 `--purge --yes` 才会删除任务和规范，且只移除 Keystone 自己写入的 gitignore managed block。
 
+## Workflow Skills
+
+Keystone 提供项目级 workflow skills，帮助 AI 正确使用任务计划、验证和交接流程。Skills 是显式辅助入口；Hook 仍然是任务状态、上下文注入和写入门禁的权威控制面。
+
+```bash
+# 查看可用 Skills 和当前项目安装状态
+keystone skills list
+
+# 仅安装到已经存在的平台目录（默认，不创建新的 AI 配置目录）
+keystone skills install --platform auto
+
+# 预览向全部目标安装（不写入）
+keystone skills install --platform all --dry-run
+
+# 安装到所有项目级目标
+keystone skills install --platform all
+```
+
+第一批 Skills：
+
+| Skill | 作用 | 产物 |
+|---|---|---|
+| `keystone-plan` | 从任务、规范和需求形成可评审计划 | `plan.md` |
+| `keystone-verify` | 组织实际验证证据、失败与风险 | 结构化会话报告 |
+| `keystone-handoff` | 保存跨会话/跨 Agent 交接事实 | `handoff.md` |
+
+安装目标：`.agents/skills/`（Codex/Pi 通用）、`.claude/skills/`、`.codebuddy/skills/`、`.zcode/skills/`。同名但非 Keystone 管理的 Skill 默认产生冲突并保持零修改；只有显式 `--force` 才覆盖。Skills 不修改 Hook、MCP、任务状态或用户级配置。
+
 ## 任务状态机
 
 ```

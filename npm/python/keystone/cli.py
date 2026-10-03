@@ -15,6 +15,7 @@ from keystone import scaffold
 from keystone.core import statemachine
 from keystone.errors import KeystoneError
 from keystone.inspection import doctor_findings, hook_commands, inspect_project
+from keystone.skills import catalog as skill_catalog
 from keystone.store import tasks as task_store
 from keystone.store.layout import find_layout
 from keystone.store.project import make_project
@@ -248,6 +249,48 @@ def cmd_events(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_skills(args: argparse.Namespace) -> int:
+    root = Path(args.dir).expanduser().resolve()
+    if not root.is_dir():
+        print(f"keystone skills: 目录不存在：{root}", file=sys.stderr)
+        return 1
+
+    if args.skills_command == "list":
+        print("Keystone workflow skills:")
+        for skill in skill_catalog.SKILL_NAMES:
+            installed = []
+            for target, relative in skill_catalog.TARGETS.items():
+                if (root / relative / skill / "SKILL.md").is_file():
+                    installed.append(target)
+            marker = ", ".join(installed) if installed else "未安装"
+            print(f"  {skill:<20} {marker}")
+        return 0
+
+    if args.skills_command == "install":
+        try:
+            changes = skill_catalog.plan_install(root, args.platform, args.force)
+        except ValueError as exc:
+            print(f"keystone skills: {exc}", file=sys.stderr)
+            return 1
+        if not changes:
+            print("· auto 未检测到已存在的平台目录；未写入任何 Skill。使用 --platform all 或指定平台。")
+            return 0
+        for change in changes:
+            print(f"{change.action:<10} {change.target}" + (f" ({change.detail})" if change.detail else ""))
+        if args.dry_run:
+            print("不会写入文件。")
+            return 0
+        conflicts = skill_catalog.apply_install(changes)
+        if conflicts:
+            print("keystone skills: 存在冲突，未写入任何文件。使用 --force 覆盖。", file=sys.stderr)
+            return 1
+        print("✓ Keystone workflow skills 已安装")
+        return 0
+
+    print(f"keystone skills: 未知子命令 {args.skills_command!r}", file=sys.stderr)
+    return 1
+
+
 def cmd_task(args: argparse.Namespace) -> int:
     layout = _require_layout()
     try:
@@ -376,6 +419,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_events.add_argument("--session", default=None, help="按会话 ID 过滤")
     p_events.add_argument("--event", default=None, help="按事件类型过滤（如 SessionEnd）")
 
+    p_skills = sub.add_parser("skills", help="管理 Keystone workflow skills")
+    skills_sub = p_skills.add_subparsers(dest="skills_command", required=True)
+    p_skills_list = skills_sub.add_parser("list", help="显示可用 Skills 和当前安装状态")
+    p_skills_list.add_argument("--dir", default=".", help="目标项目目录（默认当前目录）")
+    p_skills_install = skills_sub.add_parser("install", help="安装 workflow skills")
+    p_skills_install.add_argument("--dir", default=".", help="目标项目目录（默认当前目录）")
+    p_skills_install.add_argument("--platform", choices=("auto", "all", "agents", "claude", "codebuddy", "zcode", "codex", "pi"), default="auto")
+    p_skills_install.add_argument("--dry-run", action="store_true", help="预览安装变更，不写入")
+    p_skills_install.add_argument("--force", action="store_true", help="覆盖同名但内容不同的 Skill")
+
     p_task = sub.add_parser("task", help="任务管理")
     task_sub = p_task.add_subparsers(dest="task_command", required=True)
 
@@ -425,6 +478,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_uninstall(args)
     if args.command == "events":
         return cmd_events(args)
+    if args.command == "skills":
+        return cmd_skills(args)
     return 1
 
 

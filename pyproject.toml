@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keystone-hook"
-version = "0.2.0"
+version = "0.2.1"
 description = "Keystone: CodeBuddy 流程与上下文增强层（Hook Runner + 本地任务/规范管理）"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -40,6 +40,12 @@ keystone-hook = "keystone.hook.cli:main"
 Homepage = "https://github.com/duny31030/keystone"
 Repository = "https://github.com/duny31030/keystone"
 Issues = "https://github.com/duny31030/keystone/issues"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"keystone.assets.skills" = ["*/SKILL.md"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
