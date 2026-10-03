@@ -194,3 +194,43 @@ COMPLETED 写入拒绝、.keystone 状态保护、计划阶段拦截、Stop remi
 ### Status
 
 [OK] **Completed**
+
+## Session 10: Codex context-only adapter 与多平台收敛
+
+**Date**: 2026-10-03
+**Task**: Keystone 多平台适配设计
+**Branch**: `main`
+
+### Summary
+
+收敛多平台 adapter 边界并实现 Codex context-only adapter：settings 路径、事件集合、注册计数、deny 渲染与 capability warnings 全部下沉到 adapters/；Codex 只注册 UserPromptSubmit，只写 .codex/hooks.json；Pi/Codex 统一映射共享 .agents/skills。
+
+### Main Changes
+
+- 新增 `adapters/base.py`（PlatformAdapter protocol、JsonHookAdapter、keystone command 识别）、`adapters/registry.py`、`adapters/codebuddy.py`、`adapters/claude.py`、`adapters/codex.py`
+- `inspection.py` / `cli.py` / `hook/cli.py` 去硬编码：按 `--platform` 走 adapter，未注册事件返回 exit 1
+- `skills/catalog.py`：`SHARED_TARGET_LABEL`，auto 识别 `.codex`/`.pi` 根目录
+- 新增 Codex 测试与 `scripts/codex-smoke.sh`；`keystone events list` 兼容别名
+- README 平台矩阵与 CHANGELOG 更新；Pi TypeScript extension 明确拆分为独立后续任务
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4bc2936` | feat: add Codex context-only platform adapter |
+
+### Testing
+
+- [OK] 133 passed（`.venv/bin/pytest`）
+- [OK] wheel 构建与 fresh venv 安装 smoke：codebuddy/claude/codex doctor 与 status 输出正确
+- [OK] npm tarball 打包并通过 npm shim 安装 smoke：Codex init 与本机 hook runner 正常
+- [P] Claude / Codex 真实宿主 smoke 待用户手工执行（`scripts/claude-smoke.sh`、`scripts/codex-smoke.sh`）
+
+### Status
+
+[OK] **Completed**（真实宿主 smoke 为待办用户动作）
+
+### Next Steps
+
+- 在真实 Claude Code / Codex 中执行 smoke checklist，通过后更新 README capability status
+- 新建独立任务实现 Pi TypeScript extension（before_agent_start / tool_call / session_shutdown）

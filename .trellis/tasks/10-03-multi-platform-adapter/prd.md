@@ -80,10 +80,24 @@ keystone uninstall --platform <name>
 
 ## Acceptance Criteria
 
-- [ ] 现有 CodeBuddy init/doctor/uninstall 行为在 adapter 重构后无回归
-- [ ] `init --platform codebuddy` 与当前 settings diff 等价
-- [ ] Claude adapter 可无损写/卸载自身注册并通过真实宿主 smoke test
-- [ ] Codex adapter 不会承诺未验证的 deny/Stop 能力，并显式诊断 hooks/trust/approval 前置条件
-- [ ] Pi adapter 作为 extension 实现，而不是伪 JSON Hook；tool_call block 与 context 注入有真实 smoke test
-- [ ] 每个 adapter 的 README capability matrix 标记 verified/experimental/unverified
-- [ ] 平台安装不修改 MCP、用户级开关或第三方配置
+- [x] 现有 CodeBuddy init/doctor/uninstall 行为在 adapter 重构后无回归
+- [x] `init --platform codebuddy` 与当前 settings diff 等价
+- [x] Claude adapter 可无损写/卸载自身注册（真实宿主 smoke test 待用户在 `scripts/claude-smoke.sh` 生成的项目中执行）
+- [x] Codex adapter 不会承诺未验证的 deny/Stop 能力，并显式诊断 hooks/trust/approval 前置条件
+- [ ] Pi adapter 作为 extension 实现，而不是伪 JSON Hook；tool_call block 与 context 注入有真实 smoke test（**拆分为独立后续任务**，本批只做 shared `.agents/skills`）
+- [x] 每个 adapter 的 README capability matrix 标记 verified/experimental/unverified
+- [x] 平台安装不修改 MCP、用户级开关或第三方配置
+
+## Batch Outcome (2026-10-03)
+
+本批完成 adapter 边界收敛、Codex context-only adapter、Pi shared-skills 映射与文档/测试：
+
+- `adapters/` 下沉了 settings 路径、事件集合、注册计数、deny 渲染、环境变量兜底和 capability warnings；
+  `status` / `doctor` / `doctor --fix` / `uninstall` / hook runner 不再硬编码 CodeBuddy。
+- `CodexAdapter` 只注册 `UserPromptSubmit`，只写 `.codex/hooks.json`，doctor 明确列出用户级前置条件和未支持能力。
+- `--platform codex|pi` 与 `--platform auto` 统一映射到共享 `.agents/skills/`。
+- 保留的待办（非本批）：Claude/Codex 真实宿主 smoke 由用户手工执行；Pi TypeScript extension 另开任务。
+
+## Deferred: Pi Extension (next task)
+
+Pi 的 `before_agent_start` context、`tool_call` deny 与 `session_shutdown` metadata 需要一个 Keystone 自有的 TypeScript extension bundle。它不复用 Python stdin/stdout runner，有自己的 package-data、类型检查和真实 Pi host smoke 门槛。本批刻意不做，避免做出无法兑现的平台门禁承诺。

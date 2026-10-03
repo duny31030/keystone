@@ -57,11 +57,15 @@ Uses `.claude/settings.json` and the same command-hook list shape. It can reuse 
 
 ### Codex
 
-Uses `.codex/hooks.json` plus project config. Initial scope is context injection and shared skills only. The adapter must report missing user-side feature enablement, trust and `/hooks` approval. No strict policy or Stop gate claim.
+Uses `.codex/hooks.json`. Initial scope is context injection and shared skills only. The adapter must report missing user-side feature enablement, trust and `/hooks` approval. No strict policy or Stop gate claim.
+
+Implemented as `CodexAdapter` (context-only MVP): a single `UserPromptSubmit` registration, reusing the shared `events.user_prompt_submit()` handler. It never reads or writes `~/.codex/config.toml`, project trust, `/hooks` approval, MCP, model or sandbox settings. `capability_warnings()` surfaces the manual prerequisites and the deliberately unsupported file-tool deny / strict gate / Stop / SessionEnd.
 
 ### Pi
 
-Installs `.pi/settings.json`, shared `.agents/skills`, and a Keystone-owned TypeScript extension. It maps `before_agent_start` to context and `tool_call` to deny. This is a separate runtime bundle, built/tested independently from Python Hook Runner.
+Pi support in this batch is limited to the shared `.agents/skills` target: `keystone skills install --platform pi` installs there, `--platform auto` detects an existing `.pi/` root, and `skills list` labels the target as shared by Codex and Pi. Keystone does **not** create `.pi/settings.json`, install an extension, or claim context/deny behavior.
+
+The Pi TypeScript extension is deferred to a separate task. It will install a Keystone-owned extension mapped as `before_agent_start` → context, `tool_call` → `{ block: true, reason }` for verified native Pi write/edit tools, and `session_shutdown` → SessionEnd metadata. It is a separate runtime bundle with its own type-check and host smoke gate, built independently from the Python Hook Runner.
 
 ## 5. Compatibility and Safety
 
