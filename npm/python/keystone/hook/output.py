@@ -1,11 +1,4 @@
-"""HookOutput 构造与输出。
-
-依据调研确认的 CodeBuddy 契约：
-- 注入上下文：{"hookSpecificOutput": {"hookEventName": ..., "additionalContext": ...}}
-- PreToolUse 控制决策：hookSpecificOutput.permissionDecision = allow|ask|deny (+ reason)
-- Stop 强制阻止：{"decision": "block", "reason": ...}
-- 无输出 + exit 0 是合法 no-op；CodeBuddy 对多余字段宽容解析。
-"""
+"""Claude/CodeBuddy JSON HookOutput 构造与输出。"""
 
 from __future__ import annotations
 
@@ -35,6 +28,18 @@ def deny_pre_tool_use(reason: str) -> dict:
 
 def block_stop(reason: str) -> dict:
     return {"decision": "block", "reason": reason}
+
+
+def render_for_platform(payload: dict, platform: str) -> dict:
+    """Translate only fields where CodeBuddy and Claude differ."""
+    if platform != "claude":
+        return payload
+    output = json.loads(json.dumps(payload))
+    specific = output.get("hookSpecificOutput")
+    if isinstance(specific, dict) and specific.get("permissionDecision") == "deny":
+        if "reason" in specific:
+            specific["permissionDecisionReason"] = specific.pop("reason")
+    return output
 
 
 def emit(output: dict) -> None:

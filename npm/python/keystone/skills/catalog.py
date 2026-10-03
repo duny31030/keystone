@@ -46,7 +46,11 @@ def selected_targets(root: Path, platform: str) -> tuple[str, ...]:
     if platform == "all":
         return tuple(TARGETS)
     if platform == "auto":
-        return tuple(name for name, relative in TARGETS.items() if (root / relative).exists())
+        return tuple(
+            name
+            for name, relative in TARGETS.items()
+            if (root / Path(relative).parts[0]).exists()
+        )
     platform = PLATFORM_ALIASES.get(platform, platform)
     if platform not in TARGETS:
         raise ValueError(f"unsupported platform: {platform}")

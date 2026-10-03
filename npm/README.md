@@ -95,6 +95,27 @@ keystone events list --session <id>
 
 `uninstall` 从所有 CodeBuddy event 中移除 Keystone command，保留混合 rule 内的第三方 command、matcher 与 `.codebuddy/` 目录。默认保留 `.keystone/`；只有 `--purge --yes` 才会删除任务和规范，且只移除 Keystone 自己写入的 gitignore managed block。
 
+## Platform Support
+
+| Platform | Status | Capabilities |
+|---|---|---|
+| CodeBuddy | Verified | Project/task context, file-tool deny, plan/completion gates, Stop reminder, SessionEnd metadata |
+| Claude Code | Experimental | Project settings, context hooks, native file-tool deny renderer and SessionEnd configuration are implemented; real host smoke is still required |
+| Codex | Planned | Future context + shared Skills support; no deny/Stop guarantee |
+| Pi | Planned | Future TypeScript extension; no Python Hook compatibility claim |
+
+```bash
+# CodeBuddy remains the default
+keystone init
+
+# Configure only Claude Code hooks in the same project
+keystone init --platform claude
+keystone doctor --platform claude
+keystone uninstall --platform claude
+```
+
+Claude registers only native file tools (`Write|Edit|MultiEdit|NotebookEdit`) for PreToolUse. It does not claim Bash or MCP write protection. Claude `Stop` enforce remains experimental until verified in a real Claude Code session.
+
 ## Workflow Skills
 
 Keystone 提供项目级 workflow skills，帮助 AI 正确使用任务计划、验证和交接流程。Skills 是显式辅助入口；Hook 仍然是任务状态、上下文注入和写入门禁的权威控制面。

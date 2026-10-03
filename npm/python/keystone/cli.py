@@ -11,6 +11,7 @@ import json
 import sys
 from pathlib import Path
 
+from keystone.adapters.registry import get_adapter, supported_platforms
 from keystone import scaffold
 from keystone.core import statemachine
 from keystone.errors import KeystoneError
@@ -59,7 +60,8 @@ def cmd_init(args: argparse.Namespace) -> int:
         stop_mode=args.stop_mode, policy_mode=args.policy_mode,
     )
     try:
-        plan = scaffold.plan_init(target, project, args.hook_command)
+        adapter = get_adapter(args.platform)
+        plan = scaffold.plan_init(target, project, args.hook_command, args.platform)
     except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError) as exc:
         print(f"keystone init: 无法读取现有配置：{exc}", file=sys.stderr)
         return 1
@@ -73,7 +75,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     print(f"✓ 项目：{project['name']}（{project['language']}" + (f" / {project['framework']}" if project['framework'] else "") + "）")
     print(f"✓ 测试命令：{project['test_command'] or '（未配置）'}")
     print(f"✓ 已生成 {plan.layout.dir}" + ("" if plan.creates_project else "（已存在，未覆盖）"))
-    print(f"✓ 已{'更新' if settings_changed else '检查'} {settings_path}（hook 命令：{args.hook_command} <event>）")
+    print(f"✓ 已{'更新' if settings_changed else '检查'} {settings_path}（{adapter.display_name} hook 命令：{args.hook_command} <event>）")
     print("✓ .gitignore 已追加 .keystone/.state/" if gitignore_changed else "· .gitignore 已包含忽略项，未改动")
     print("\n下一步：")
     print("  1. 编辑 .keystone/specs/ 下的规范文件（按项目实际填写）")
@@ -82,8 +84,8 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-def _target_layout(target: Path):
-    info = inspect_project(target)
+def _target_layout(target: Path, platform: str = "codebuddy"):
+    info = inspect_project(target, platform)
     layout = info["layout"]
     if layout is None or info["project"].state != "ok":
         print("keystone: 当前目录不是有效的 keystone 项目（未找到或无法读取 .keystone/project.json）。\n"
@@ -94,7 +96,7 @@ def _target_layout(target: Path):
 
 def cmd_status(args: argparse.Namespace) -> int:
     target = Path(args.dir).expanduser().resolve()
-    layout, info = _target_layout(target)
+    layout, info = _target_layout(target, args.platform)
     if layout is None:
         return 1
     project = info["project"].value
@@ -109,7 +111,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     counts = {status: sum(task.get("status") == status for task in valid_tasks) for status in statemachine.STATUSES}
     pending = sum(bool(task.get("pending_confirmation")) for task in valid_tasks)
     active = sum(task.get("status") != "COMPLETED" for task in valid_tasks)
-    registered = hook_commands(info["settings"].value) if info.get("settings") and info["settings"].state == "ok" else {}
+    registered = hook_commands(info["settings"].value, args.platform) if info.get("settings") and info["settings"].state == "ok" else {}
     session_count = len(info["sessions"].value) if info["sessions"].state == "ok" and isinstance(info["sessions"].value, dict) else 0
     event_count = 0
     if layout.events_jsonl.is_file():
@@ -132,7 +134,7 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 def cmd_doctor(args: argparse.Namespace) -> int:
     target = Path(args.dir).expanduser().resolve()
-    findings = doctor_findings(target)
+    findings = doctor_findings(target, args.platform)
     totals = {level: 0 for level in ("PASS", "WARN", "FAIL")}
     for level, name, detail in findings:
         totals[level] += 1
@@ -144,7 +146,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     # --fix 模式：尝试修复可安全修复的问题
     from keystone.inspection import doctor_fix
-    fixed = doctor_fix(target, args.hook_command)
+    fixed = doctor_fix(target, args.hook_command, args.platform)
     if not fixed:
         print("\n· 无可修复的问题")
         return 1 if totals["FAIL"] else 0
@@ -155,7 +157,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     # 修复后重新运行 doctor
     print("\n修复后重新检查：")
-    findings = doctor_findings(target)
+    findings = doctor_findings(target, args.platform)
     totals = {level: 0 for level in ("PASS", "WARN", "FAIL")}
     for level, name, detail in findings:
         totals[level] += 1
@@ -177,7 +179,7 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
             print("已取消。")
             return 1
     try:
-        plan = scaffold.plan_uninstall(target, args.purge)
+        plan = scaffold.plan_uninstall(target, args.purge, args.platform)
     except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError) as exc:
         print(f"keystone uninstall: 无法读取现有配置：{exc}", file=sys.stderr)
         return 1
@@ -395,20 +397,24 @@ def build_parser() -> argparse.ArgumentParser:
                         help="strict 下未绑定任务时也禁止写文件（默认 permissive）")
     p_init.add_argument("--hook-command", default="keystone-hook",
                         help="hook 注册的命令前缀（需包含 keystone 字样以便幂等合并），如 'python3 -m keystone.hook'")
+    p_init.add_argument("--platform", choices=supported_platforms(), default="codebuddy", help="Hook 平台（默认 codebuddy）")
     p_init.add_argument("-y", "--yes", action="store_true",
                         help="非交互模式：缺失信息一律用默认值")
     p_init.add_argument("--dry-run", action="store_true", help="预览将要创建或更新的文件，不写入")
 
     p_status = sub.add_parser("status", help="显示项目、任务和本地注册摘要")
     p_status.add_argument("--dir", default=".", help="项目目录（默认当前目录，可从子目录向上定位）")
+    p_status.add_argument("--platform", choices=supported_platforms(), default="codebuddy", help="检查的 Hook 平台（默认 codebuddy）")
 
     p_doctor = sub.add_parser("doctor", help="检查本地 Keystone 配置健康状态")
     p_doctor.add_argument("--dir", default=".", help="项目目录（默认当前目录，可从子目录向上定位）")
+    p_doctor.add_argument("--platform", choices=supported_platforms(), default="codebuddy", help="检查的 Hook 平台（默认 codebuddy）")
     p_doctor.add_argument("--fix", action="store_true", help="自动修复可安全修复的问题")
     p_doctor.add_argument("--hook-command", default="keystone-hook", help="hook 注册的命令前缀")
 
     p_uninstall = sub.add_parser("uninstall", help="移除 Keystone Hook 注册")
     p_uninstall.add_argument("--dir", default=".", help="目标项目目录（默认当前目录）")
+    p_uninstall.add_argument("--platform", choices=supported_platforms(), default="codebuddy", help="移除的 Hook 平台（默认 codebuddy）")
     p_uninstall.add_argument("--dry-run", action="store_true", help="预览卸载变更，不写入")
     p_uninstall.add_argument("--purge", action="store_true", help="同时删除 .keystone/ 项目资料")
     p_uninstall.add_argument("-y", "--yes", action="store_true", help="确认 --purge（非交互环境必需）")

@@ -73,10 +73,14 @@ def _pick(data: dict, field: str):
     return None
 
 
-def parse_fields(data: dict) -> dict:
-    """归一化 hook 输入字段；环境变量作为 cwd/session 的兜底。"""
-    cwd = _pick(data, "cwd") or os.environ.get("CODEBUDDY_PROJECT_DIR") or os.getcwd()
-    session_id = _pick(data, "session_id") or os.environ.get("CODEBUDDY_SESSION_ID") or ""
+def parse_fields(data: dict, environment_defaults: dict[str, str] | None = None) -> dict:
+    """归一化 hook 输入字段；平台环境变量作为 cwd/session 的兜底。"""
+    defaults = environment_defaults or {
+        "cwd": "CODEBUDDY_PROJECT_DIR",
+        "session_id": "CODEBUDDY_SESSION_ID",
+    }
+    cwd = _pick(data, "cwd") or os.environ.get(defaults.get("cwd", "")) or os.getcwd()
+    session_id = _pick(data, "session_id") or os.environ.get(defaults.get("session_id", "")) or ""
     tool_input = _pick(data, "tool_input")
     stop_active = data.get("stop_hook_active", data.get("stopHookActive", False))
     return {

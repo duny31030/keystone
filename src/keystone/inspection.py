@@ -6,9 +6,10 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
+from keystone.adapters.registry import get_adapter
 from keystone.core.statemachine import STATUSES
-from keystone.scaffold import EXPECTED_EVENTS, RETIRED_EVENTS, _is_keystone_command, build_hooks_block, merge_settings, remove_keystone_settings
-from keystone.store.layout import CODEBUDDY_SETTINGS, KeystoneLayout, find_layout
+from keystone.scaffold import GITIGNORE_BLOCK, GITIGNORE_ENTRY
+from keystone.store.layout import KeystoneLayout, find_layout
 from keystone.store.specs import SPEC_CATEGORIES, write_templates as write_spec_templates
 
 
@@ -36,29 +37,17 @@ def resolve_layout(target: Path) -> KeystoneLayout | None:
     return find_layout(target)
 
 
-def hook_commands(settings: dict) -> dict[str, list[str]]:
-    result: dict[str, list[str]] = {}
-    hooks = settings.get("hooks", {})
-    if not isinstance(hooks, dict):
-        return result
-    for event, rules in hooks.items():
-        if not isinstance(rules, list):
-            continue
-        for rule in rules:
-            if not isinstance(rule, dict):
-                continue
-            for hook in rule.get("hooks", []):
-                if _is_keystone_command(hook):
-                    result.setdefault(str(event), []).append(str(hook.get("command", "")))
-    return result
+def hook_commands(settings: dict, platform: str = "codebuddy") -> dict[str, list[str]]:
+    return get_adapter(platform).registered_commands(settings)
 
 
-def inspect_project(target: Path) -> dict:
+def inspect_project(target: Path, platform: str = "codebuddy") -> dict:
+    adapter = get_adapter(platform)
     layout = resolve_layout(target)
     if layout is None:
         return {"layout": None, "project": JsonView(target / ".keystone/project.json", "missing")}
     project = inspect_json(layout.project_json)
-    settings = inspect_json(layout.root / CODEBUDDY_SETTINGS)
+    settings = inspect_json(layout.root / adapter.settings_relative_path)
     sessions = inspect_json(layout.sessions_json)
     tasks: list[tuple[Path, JsonView]] = []
     if layout.tasks_dir.is_dir():
@@ -68,8 +57,9 @@ def inspect_project(target: Path) -> dict:
     return {"layout": layout, "project": project, "settings": settings, "sessions": sessions, "tasks": tasks}
 
 
-def doctor_findings(target: Path) -> list[tuple[str, str, str]]:
-    info = inspect_project(target)
+def doctor_findings(target: Path, platform: str = "codebuddy") -> list[tuple[str, str, str]]:
+    adapter = get_adapter(platform)
+    info = inspect_project(target, platform)
     layout = info["layout"]
     if layout is None:
         return [("FAIL", "project", "未找到 .keystone/project.json；在项目根目录执行 keystone init")]
@@ -84,7 +74,7 @@ def doctor_findings(target: Path) -> list[tuple[str, str, str]]:
         if data.get(field) not in valid:
             findings.append(("FAIL", field, f"无效值：{data.get(field)!r}"))
     if data.get("stop_mode") == "enforce":
-        findings.append(("WARN", "stop_mode", "enforce 的 CodeBuddy 宿主阻止行为尚未实机验证"))
+        findings.append(("WARN", "stop_mode", f"enforce 的 {adapter.display_name} 宿主阻止行为尚未实机验证"))
     for category in SPEC_CATEGORIES:
         path = layout.specs_dir / f"{category}.md"
         findings.append(("PASS" if path.is_file() else "WARN", "spec", str(path.relative_to(layout.root))))
@@ -95,17 +85,20 @@ def doctor_findings(target: Path) -> list[tuple[str, str, str]]:
     findings.append(("PASS" if ignored else "WARN", "gitignore", "runtime state ignored" if ignored else "缺少 .keystone/.state/ 忽略项"))
     settings: JsonView = info["settings"]
     if settings.state == "missing":
-        findings.append(("WARN", "settings", "未找到 .codebuddy/settings.json；运行 keystone init 修复"))
+        findings.append(("WARN", "settings", f"未找到 {adapter.settings_relative_path}；运行 keystone init --platform {platform} 修复"))
     elif settings.state != "ok" or not isinstance(settings.value, dict) or not isinstance(settings.value.get("hooks", {}), dict):
-        findings.append(("FAIL", "settings", f"settings.json {settings.state if settings.state != 'ok' else 'hooks 必须是 object'}"))
+        findings.append(("FAIL", "settings", f"{adapter.settings_relative_path} {settings.state if settings.state != 'ok' else 'hooks 必须是 object'}"))
     else:
-        registered = hook_commands(settings.value)
-        for event in EXPECTED_EVENTS:
+        registered = adapter.registered_commands(settings.value)
+        for event in adapter.expected_events:
             count = len(registered.get(event, []))
-            findings.append(("PASS" if count == 1 or event == "SessionStart" and count == 3 else "WARN", "hook", f"{event}: {count} Keystone registrations"))
-        for event in RETIRED_EVENTS:
+            expected_count = 5 if platform == "claude" and event in {"SessionStart", "SessionEnd"} else 3 if event == "SessionStart" else 1
+            findings.append(("PASS" if count == expected_count else "WARN", "hook", f"{event}: {count} Keystone registrations"))
+        for event in adapter.retired_events:
             if registered.get(event):
-                findings.append(("WARN", "hook", f"存在退役 Keystone {event} 注册；运行 keystone init 清理"))
+                findings.append(("WARN", "hook", f"存在退役 Keystone {event} 注册；运行 keystone init --platform {platform} 清理"))
+        if platform == "claude":
+            findings.append(("WARN", "capability", "Claude Hook 配置已注册；宿主注入、file-tool deny、Stop 行为待真实 smoke 验证"))
     for directory, task in info["tasks"]:
         if task.state != "ok" or not isinstance(task.value, dict):
             findings.append(("WARN", "task", f"{directory.name}/task.json {task.state}"))
@@ -118,23 +111,23 @@ def doctor_findings(target: Path) -> list[tuple[str, str, str]]:
     return findings
 
 
-def doctor_fix(target: Path, prefix: str = "keystone-hook") -> list[str]:
+def doctor_fix(target: Path, prefix: str = "keystone-hook", platform: str = "codebuddy") -> list[str]:
     """自动修复 doctor 发现的可安全修复问题，返回修复动作列表。"""
     from keystone.util import atomic_write_json
-    from keystone.scaffold import GITIGNORE_BLOCK, GITIGNORE_ENTRY, GITIGNORE_MARKER
 
-    info = inspect_project(target)
+    adapter = get_adapter(platform)
+    info = inspect_project(target, platform)
     layout = info["layout"]
     if layout is None:
         return []
     fixed: list[str] = []
 
     # 修复 settings.json：补齐缺失的 hook 注册，清理退役条目
-    settings_path = layout.root / CODEBUDDY_SETTINGS
+    settings_path = layout.root / adapter.settings_relative_path
     settings_view = info["settings"]
     if settings_view.state == "missing" or settings_view.state == "ok":
         existing = settings_view.value if settings_view.state == "ok" else None
-        merged = merge_settings(existing, prefix)
+        merged = adapter.merge_settings(existing, prefix)
         if existing != merged:
             atomic_write_json(settings_path, merged)
             fixed.append(f"更新 {settings_path.name}（补齐/清理 Keystone hook 注册）")
