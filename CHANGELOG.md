@@ -6,6 +6,21 @@
 
 ## [Unreleased]
 
+### Added
+- Platform adapter 层：`src/keystone/adapters/`，把配置路径、事件注册、deny 渲染、注册计数和 capability 提示从共享核心下沉到平台薄适配器
+- Codex 平台支持（context-only，experimental）：`keystone init|doctor|uninstall --platform codex` 只操作 `.codex/hooks.json`，只注册 `UserPromptSubmit` 注入任务上下文
+- Claude/Codex 真实宿主 smoke 脚本：`scripts/claude-smoke.sh`、`scripts/codex-smoke.sh`
+- `keystone skills install --platform codex|pi` 明确映射共享 `.agents/skills/`；`skills list` 显示 shared target
+
+### Changed
+- `keystone status` / `keystone doctor` / hook runner 不再硬编码 CodeBuddy 事件计数、设置路径和平台白名单，一律按 `--platform` 走 adapter
+- README 平台矩阵区分 CodeBuddy verified、Claude experimental、Codex experimental (context only)、Pi shared skills only
+
+### Notes
+- Codex 适配刻意不提供 file-tool deny、strict gate、Stop、SessionEnd；这些能力需要独立宿主验证后才可能引入
+- Codex 用户级前置条件（`hooks = true`、project trust、`/hooks` 审批）由 Keystone 提示但不代改
+- Pi TypeScript extension 拆分为后续独立任务，未在本版本引入
+
 ## [0.2.1] - 2026-10-03
 
 ### Added

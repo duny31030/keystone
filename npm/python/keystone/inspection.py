@@ -92,13 +92,12 @@ def doctor_findings(target: Path, platform: str = "codebuddy") -> list[tuple[str
         registered = adapter.registered_commands(settings.value)
         for event in adapter.expected_events:
             count = len(registered.get(event, []))
-            expected_count = 5 if platform == "claude" and event in {"SessionStart", "SessionEnd"} else 3 if event == "SessionStart" else 1
-            findings.append(("PASS" if count == expected_count else "WARN", "hook", f"{event}: {count} Keystone registrations"))
+            findings.append(("PASS" if count == adapter.expected_registration_count(event) else "WARN", "hook", f"{event}: {count} Keystone registrations"))
         for event in adapter.retired_events:
             if registered.get(event):
                 findings.append(("WARN", "hook", f"存在退役 Keystone {event} 注册；运行 keystone init --platform {platform} 清理"))
-        if platform == "claude":
-            findings.append(("WARN", "capability", "Claude Hook 配置已注册；宿主注入、file-tool deny、Stop 行为待真实 smoke 验证"))
+        for warning in adapter.capability_warnings():
+            findings.append(("WARN", "capability", warning))
     for directory, task in info["tasks"]:
         if task.state != "ok" or not isinstance(task.value, dict):
             findings.append(("WARN", "task", f"{directory.name}/task.json {task.state}"))

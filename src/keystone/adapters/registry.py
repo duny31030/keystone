@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from keystone.adapters.claude import ClaudeAdapter
 from keystone.adapters.codebuddy import CodeBuddyAdapter
+from keystone.adapters.codex import CodexAdapter
 
 _ADAPTERS = {
     "codebuddy": CodeBuddyAdapter(),
     "claude": ClaudeAdapter(),
+    "codex": CodexAdapter(),
 }
 
 

@@ -21,6 +21,11 @@ def test_events_list_empty(project_dir, capsys):
     assert "暂无事件记录" in capsys.readouterr().out
 
 
+def test_events_accepts_optional_list_alias(project_dir, capsys):
+    assert keystone_main(["events", "list", "--dir", str(project_dir)]) == 0
+    assert "暂无事件记录" in capsys.readouterr().out
+
+
 def test_events_list_all(project_dir, capsys):
     layout = KeystoneLayout(project_dir)
     _write_events(layout, [

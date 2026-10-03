@@ -1,4 +1,8 @@
-"""项目脚手架、CodeBuddy hook 配置合并与生命周期变更计划。"""
+"""项目脚手架与生命周期变更计划。
+
+平台差异（配置路径、事件注册、deny 渲染）由 `adapters/` 承担；本模块只负责
+`.keystone/` 目录、`.gitignore` managed block 与 settings 的合并式写入。
+"""
 
 from __future__ import annotations
 
@@ -7,16 +11,13 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from keystone.adapters.codebuddy import TOOL_MATCHER
+from keystone.adapters.codebuddy import TOOL_MATCHER  # noqa: F401 - 兼容 re-export
 from keystone.adapters.registry import get_adapter
 from keystone.store.layout import KeystoneLayout
 from keystone.store.project import save_project
 from keystone.store.specs import SPEC_CATEGORIES, write_templates as write_spec_templates
 from keystone.util import atomic_write_json
 
-RETIRED_EVENTS = ("PostToolUse", "PreCompact")
-EXPECTED_EVENTS = ("SessionStart", "UserPromptSubmit", "PreToolUse", "Stop", "SessionEnd")
-_HOOK_TIMEOUT = 15
 GITIGNORE_MARKER = "# Keystone runtime state (managed by keystone init)"
 GITIGNORE_ENTRY = ".keystone/.state/"
 GITIGNORE_BLOCK = f"{GITIGNORE_MARKER}\n{GITIGNORE_ENTRY}\n"

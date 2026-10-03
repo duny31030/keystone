@@ -86,12 +86,12 @@ keystone uninstall --purge --dry-run
 keystone uninstall --purge --yes
 
 # 查看本地 SessionEnd 事件记录（可按任务/会话/事件类型过滤）
-keystone events list
-keystone events list --task TASK-001
-keystone events list --session <id>
+keystone events
+keystone events --task TASK-001
+keystone events --session <id>
 ```
 
-`doctor` 只检查磁盘上的项目配置和 `.codebuddy/settings.json` 的静态注册，不会声称 CodeBuddy 已加载或实际触发 Hook。`doctor --fix` 自动修复可安全修复的问题：补齐缺失的五个已验证 Hook 注册、清理退役的 PostToolUse/PreCompact 条目、补 `.gitignore` 的 managed block、创建缺失的 `.keystone/` 目录结构和规范模板。**不修复**损坏的 JSON 文件或用户自定义内容。`status` 是只读摘要；两者都不执行构建、测试或修改代码。
+`doctor` 按 `--platform` 只检查磁盘上的项目配置和对应平台的 settings（如 `.codebuddy/settings.json`、`.claude/settings.json`、`.codex/hooks.json`）静态注册，不会声称宿主已加载或实际触发 Hook。`doctor --fix` 自动修复可安全修复的问题：补齐缺失的 Hook 注册、清理退役的 PostToolUse/PreCompact 条目、补 `.gitignore` 的 managed block、创建缺失的 `.keystone/` 目录结构和规范模板。**不修复**损坏的 JSON 文件或用户自定义内容。`status` 是只读摘要；两者都不执行构建、测试或修改代码。
 
 `uninstall` 从所有 CodeBuddy event 中移除 Keystone command，保留混合 rule 内的第三方 command、matcher 与 `.codebuddy/` 目录。默认保留 `.keystone/`；只有 `--purge --yes` 才会删除任务和规范，且只移除 Keystone 自己写入的 gitignore managed block。
 
@@ -101,8 +101,8 @@ keystone events list --session <id>
 |---|---|---|
 | CodeBuddy | Verified | Project/task context, file-tool deny, plan/completion gates, Stop reminder, SessionEnd metadata |
 | Claude Code | Experimental | Project settings, context hooks, native file-tool deny renderer and SessionEnd configuration are implemented; real host smoke is still required |
-| Codex | Planned | Future context + shared Skills support; no deny/Stop guarantee |
-| Pi | Planned | Future TypeScript extension; no Python Hook compatibility claim |
+| Codex | Experimental (context only) | `.codex/hooks.json` with a single `UserPromptSubmit` registration; no file-tool deny, strict gate, Stop or SessionEnd |
+| Pi | Shared skills only | Project-level `.agents/skills/` install; no Python Hook compatibility claim, TypeScript extension is deferred |
 
 ```bash
 # CodeBuddy remains the default
@@ -115,6 +115,24 @@ keystone uninstall --platform claude
 ```
 
 Claude registers only native file tools (`Write|Edit|MultiEdit|NotebookEdit`) for PreToolUse. It does not claim Bash or MCP write protection. Claude `Stop` enforce remains experimental until verified in a real Claude Code session.
+
+### Codex（context-only）
+
+Codex 适配是刻意收窄的 MVP：只注册 `UserPromptSubmit`，复用已验证的任务上下文逻辑，不做任何写入门禁或结束控制。
+
+```bash
+keystone init --platform codex
+keystone doctor --platform codex
+keystone uninstall --platform codex
+```
+
+它只写 `.codex/hooks.json`，**不读取也不修改**用户级 `~/.codex/config.toml`、项目 trust、`/hooks` 审批、MCP、模型或 sandbox。使用前需要你在用户侧手工完成三件事（Keystone 只提示、不代劳）：
+
+1. 在用户 config 启用 `[features] hooks = true`（旧版本用对应的 legacy 开关）；
+2. 把项目标记为 trusted；
+3. 在 interactive Codex 中运行 `/hooks` 审批 Keystone command。
+
+`keystone doctor --platform codex` 会把这三点和“不提供 file-tool deny / strict gate / Stop / SessionEnd”作为 WARN 明确列出，不会把未验证的能力伪装成可用。Codex 与 Pi 共用 `.agents/skills/` 目标，`keystone skills install --platform codex|pi` 都会安装到该目录。
 
 ## Workflow Skills
 
@@ -142,7 +160,7 @@ keystone skills install --platform all
 | `keystone-verify` | 组织实际验证证据、失败与风险 | 结构化会话报告 |
 | `keystone-handoff` | 保存跨会话/跨 Agent 交接事实 | `handoff.md` |
 
-安装目标：`.agents/skills/`（Codex/Pi 通用）、`.claude/skills/`、`.codebuddy/skills/`、`.zcode/skills/`。同名但非 Keystone 管理的 Skill 默认产生冲突并保持零修改；只有显式 `--force` 才覆盖。Skills 不修改 Hook、MCP、任务状态或用户级配置。
+安装目标：`.agents/skills/`（Codex/Pi 共用）、`.claude/skills/`、`.codebuddy/skills/`、`.zcode/skills/`。`--platform codex` 和 `--platform pi` 都映射到同一个共享 `.agents/skills/` 目标；`--platform auto` 会在检测到 `.codex/` 或 `.pi/` 根目录时也选择该目标。同名但非 Keystone 管理的 Skill 默认产生冲突并保持零修改；只有显式 `--force` 才覆盖。Skills 不修改 Hook、MCP、任务状态或用户级配置。
 
 ## 任务状态机
 
@@ -195,7 +213,7 @@ uv venv .venv && uv pip install -e '.[dev]'
 .venv/bin/pytest
 ```
 
-代码分层：`hook/`（stdin/stdout 协议与事件分发）、`core/`（状态机、上下文渲染等业务核心）、`store/`（`.keystone/` 目录存储实现）、`cli.py`（init / task 命令）、`scaffold.py`（settings.json 合并式注册）。
+代码分层：`hook/`（stdin/stdout 协议与事件分发）、`core/`（状态机、上下文渲染等业务核心）、`store/`（`.keystone/` 目录存储实现）、`adapters/`（平台薄适配层：配置路径、事件注册与输出渲染）、`cli.py`（init / task 命令）、`scaffold.py`（settings.json 合并式注册）。
 
 ## Phase 2 展望（中心服务端）
 

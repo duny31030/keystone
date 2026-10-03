@@ -48,3 +48,9 @@ class ClaudeAdapter(JsonHookAdapter):
 
     def environment_defaults(self) -> dict[str, str]:
         return {"cwd": "CLAUDE_PROJECT_DIR", "session_id": "CLAUDE_SESSION_ID"}
+
+    def expected_registration_count(self, event: str) -> int:
+        return 5 if event in {"SessionStart", "SessionEnd"} else 1
+
+    def capability_warnings(self) -> tuple[str, ...]:
+        return ("Claude Hook 配置已注册；宿主注入、file-tool deny、Stop 行为待真实 smoke 验证",)

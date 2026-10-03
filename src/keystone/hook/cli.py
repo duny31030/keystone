@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sys
 
-from keystone.adapters.registry import get_adapter
+from keystone.adapters.registry import get_adapter, supported_platforms
 from keystone.hook import events, input as hook_input, output
 from keystone.store import layout as layout_mod
 
@@ -29,7 +29,9 @@ EVENT_HANDLERS = {
     "SessionEnd": events.session_end,
 }
 
-USAGE = "usage: keystone-hook [--platform codebuddy|claude] <session-start|user-prompt-submit|pre-tool-use|stop|session-end>"
+_PLATFORMS = "|".join(supported_platforms())
+_EVENTS = "|".join(alias for alias in EVENT_ALIASES)
+USAGE = f"usage: keystone-hook [--platform {_PLATFORMS}] <{_EVENTS}>"
 
 
 def _parse_args(args: list[str]) -> tuple[str, str] | None:
@@ -62,7 +64,9 @@ def main(argv: list[str] | None = None) -> int:
         print(USAGE, file=sys.stderr)
         return 1
     platform, event_arg = parsed
-    if platform not in {"codebuddy", "claude"}:
+    try:
+        adapter = get_adapter(platform)
+    except ValueError:
         print(f"keystone-hook: 不支持的平台 {platform!r}\n{USAGE}", file=sys.stderr)
         return 1
     event = resolve_event(event_arg)
@@ -70,8 +74,10 @@ def main(argv: list[str] | None = None) -> int:
     if handler is None:
         print(f"keystone-hook: 未知事件 {event_arg!r}\n{USAGE}", file=sys.stderr)
         return 1
+    if event not in adapter.expected_events:
+        print(f"keystone-hook: {adapter.display_name} adapter 不支持事件 {event}\n{USAGE}", file=sys.stderr)
+        return 1
 
-    adapter = get_adapter(platform)
     fields = hook_input.parse_fields(
         hook_input.read_hook_input(),
         adapter.environment_defaults(),

@@ -18,6 +18,7 @@ PLATFORM_ALIASES = {
     "codex": "agents",
     "pi": "agents",
 }
+SHARED_TARGET_LABEL = "agents (shared by Codex and Pi)"
 
 
 @dataclass(frozen=True)
@@ -46,11 +47,16 @@ def selected_targets(root: Path, platform: str) -> tuple[str, ...]:
     if platform == "all":
         return tuple(TARGETS)
     if platform == "auto":
-        return tuple(
-            name
-            for name, relative in TARGETS.items()
-            if (root / Path(relative).parts[0]).exists()
-        )
+        detected = []
+        for name, relative in TARGETS.items():
+            root_dir = root / Path(relative).parts[0]
+            if root_dir.exists():
+                detected.append(name)
+        # Codex/Pi use the shared .agents/skills target even when .agents is absent.
+        if (root / ".codex").exists() or (root / ".pi").exists():
+            if "agents" not in detected:
+                detected.append("agents")
+        return tuple(detected)
     platform = PLATFORM_ALIASES.get(platform, platform)
     if platform not in TARGETS:
         raise ValueError(f"unsupported platform: {platform}")

@@ -80,7 +80,9 @@ def cmd_init(args: argparse.Namespace) -> int:
     print("\n下一步：")
     print("  1. 编辑 .keystone/specs/ 下的规范文件（按项目实际填写）")
     print("  2. keystone task create \"<任务标题>\" 创建第一个任务")
-    print("  3. 在 CodeBuddy 中打开项目，hook 会在会话开始/提交 prompt 时自动注入上下文")
+    print(f"  3. 在 {adapter.display_name} 中打开项目，hook 会在会话开始/提交 prompt 时自动注入上下文")
+    for warning in adapter.capability_warnings():
+        print(f"  ! {warning}")
     return 0
 
 
@@ -96,13 +98,14 @@ def _target_layout(target: Path, platform: str = "codebuddy"):
 
 def cmd_status(args: argparse.Namespace) -> int:
     target = Path(args.dir).expanduser().resolve()
+    adapter = get_adapter(args.platform)
     layout, info = _target_layout(target, args.platform)
     if layout is None:
         return 1
     project = info["project"].value
     assert isinstance(project, dict)
     if info["settings"].state not in ("missing", "ok"):
-        print("keystone status: .codebuddy/settings.json 无法读取；运行 keystone doctor 查看详情。", file=sys.stderr)
+        print(f"keystone status: {adapter.settings_relative_path} 无法读取；运行 keystone doctor 查看详情。", file=sys.stderr)
         return 1
     if info["sessions"].state not in ("missing", "ok"):
         print("keystone status: .keystone/.state/sessions.json 无法读取；运行 keystone doctor 查看详情。", file=sys.stderr)
@@ -126,8 +129,8 @@ def cmd_status(args: argparse.Namespace) -> int:
     print(f"Test command: {project.get('test_command') or '（未配置）'}")
     print(f"\nTasks: {len(valid_tasks)} total, {active} active, {counts['COMPLETED']} completed, {pending} pending confirmation")
     print("  " + "  ".join(f"{status}: {counts[status]}" for status in statemachine.STATUSES))
-    registered_events = sum(bool(registered.get(event)) for event in scaffold.EXPECTED_EVENTS)
-    print(f"Hooks: {registered_events}/{len(scaffold.EXPECTED_EVENTS)} verified event registrations in .codebuddy/settings.json")
+    registered_events = sum(bool(registered.get(event)) for event in adapter.expected_events)
+    print(f"Hooks: {registered_events}/{len(adapter.expected_events)} expected event registrations in {adapter.settings_relative_path}")
     print(f"Runtime: {session_count} session bindings, {event_count} SessionEnd records")
     return 0
 
@@ -265,6 +268,8 @@ def cmd_skills(args: argparse.Namespace) -> int:
                 if (root / relative / skill / "SKILL.md").is_file():
                     installed.append(target)
             marker = ", ".join(installed) if installed else "未安装"
+            if "agents" in installed:
+                marker = marker.replace("agents", skill_catalog.SHARED_TARGET_LABEL)
             print(f"  {skill:<20} {marker}")
         return 0
 
@@ -420,6 +425,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_uninstall.add_argument("-y", "--yes", action="store_true", help="确认 --purge（非交互环境必需）")
 
     p_events = sub.add_parser("events", help="查看本地事件记录")
+    p_events.add_argument("events_command", nargs="?", choices=("list",), default=None,
+                          help="可选子命令别名；keystone events 与 keystone events list 等价")
     p_events.add_argument("--dir", default=".", help="项目目录（默认当前目录）")
     p_events.add_argument("--task", default=None, help="按任务过滤（如 TASK-001）")
     p_events.add_argument("--session", default=None, help="按会话 ID 过滤")

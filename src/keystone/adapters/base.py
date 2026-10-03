@@ -25,6 +25,8 @@ class PlatformAdapter(Protocol):
     retired_events: tuple[str, ...]
     capabilities: PlatformCapabilities
 
+    def expected_registration_count(self, event: str) -> int: ...
+    def capability_warnings(self) -> tuple[str, ...]: ...
     def build_hooks(self, runner_command: str) -> dict: ...
     def merge_settings(self, existing: dict | None, runner_command: str) -> dict: ...
     def remove_keystone_settings(self, existing: dict) -> dict: ...
@@ -124,3 +126,9 @@ class JsonHookAdapter:
 
     def environment_defaults(self) -> dict[str, str]:
         return {}
+
+    def expected_registration_count(self, event: str) -> int:
+        return 3 if event == "SessionStart" else 1
+
+    def capability_warnings(self) -> tuple[str, ...]:
+        return ()

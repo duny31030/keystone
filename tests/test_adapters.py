@@ -8,10 +8,11 @@ from keystone.adapters.registry import get_adapter, supported_platforms
 from keystone.hook.output import render_for_platform
 
 
-def test_registry_exposes_codebuddy_and_claude():
-    assert supported_platforms() == ("claude", "codebuddy")
+def test_registry_exposes_supported_platforms():
+    assert supported_platforms() == ("claude", "codebuddy", "codex")
     assert get_adapter().name == "codebuddy"
     assert get_adapter("claude").settings_relative_path == ".claude/settings.json"
+    assert get_adapter("codex").settings_relative_path == ".codex/hooks.json"
 
 
 def test_codebuddy_default_hooks_are_unchanged():
