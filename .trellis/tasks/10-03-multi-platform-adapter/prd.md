@@ -101,3 +101,13 @@ keystone uninstall --platform <name>
 ## Deferred: Pi Extension (next task)
 
 Pi 的 `before_agent_start` context、`tool_call` deny 与 `session_shutdown` metadata 需要一个 Keystone 自有的 TypeScript extension bundle。它不复用 Python stdin/stdout runner，有自己的 package-data、类型检查和真实 Pi host smoke 门槛。本批刻意不做，避免做出无法兑现的平台门禁承诺。
+
+该工作已拆为子任务 **`.trellis/tasks/10-05-pi-extension/`**（status: planning）。
+
+源码调研（`10-05-pi-extension/research/trellis-pi-reference.md`，基于本机 `@mindfoldhq/trellis@0.6.17` dist 实证）修正了本设计中的三处假设：
+
+- `tool_call` 在 Trellis 中**不做 deny**，只改写 bash command 字符串；`{ block: true, reason }` 形状无源码支撑，属未验证假设。
+- `session_shutdown` 在 Trellis 中**不落盘**，只清内存；"能拿到 session id 用于 SessionEnd metadata"未经证实。
+- `session_start` **不能修改模型上下文**；Pi 上真正的启动注入只能在 `before_agent_start`。
+
+子任务因此把"真实 Pi 观测"设为阻塞性前置：三个契约未实测前不写 extension 代码。

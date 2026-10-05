@@ -26,9 +26,9 @@ Each adapter maps a supported semantic effect to native protocol:
 
 | Effect | CodeBuddy / Claude | Codex MVP | Pi |
 |---|---|---|---|
-| InjectContext | hookSpecificOutput.additionalContext | UserPromptSubmit / SubagentStart additionalContext | before_agent_start systemPrompt/message |
-| DenyTool | PreToolUse permissionDecision=deny | unsupported | tool_call block=true |
-| BlockStop | Stop decision=block (host behavior must be tested) | unsupported | adapter-specific settle callback, later |
+| InjectContext | hookSpecificOutput.additionalContext | UserPromptSubmit / SubagentStart additionalContext | before_agent_start systemPrompt/message (verified in Trellis source) |
+| DenyTool | PreToolUse permissionDecision=deny | unsupported | unverified — planned `tool_call` block, no source evidence |
+| BlockStop | Stop decision=block (host behavior must be tested) | unsupported | unverified — no known Pi mechanism |
 
 ## 3. Adapter Contract
 
@@ -65,7 +65,9 @@ Implemented as `CodexAdapter` (context-only MVP): a single `UserPromptSubmit` re
 
 Pi support in this batch is limited to the shared `.agents/skills` target: `keystone skills install --platform pi` installs there, `--platform auto` detects an existing `.pi/` root, and `skills list` labels the target as shared by Codex and Pi. Keystone does **not** create `.pi/settings.json`, install an extension, or claim context/deny behavior.
 
-The Pi TypeScript extension is deferred to a separate task. It will install a Keystone-owned extension mapped as `before_agent_start` → context, `tool_call` → `{ block: true, reason }` for verified native Pi write/edit tools, and `session_shutdown` → SessionEnd metadata. It is a separate runtime bundle with its own type-check and host smoke gate, built independently from the Python Hook Runner.
+The Pi TypeScript extension is deferred to a separate task (`.trellis/tasks/10-05-pi-extension/`). Planned mapping: `before_agent_start` → context, `tool_call` → write denial for verified native Pi tools, `session_shutdown` → SessionEnd metadata. It is a separate runtime bundle with its own type-check and host smoke gate, built independently from the Python Hook Runner.
+
+**Correction (source-verified 2026-10-05):** reading `@mindfoldhq/trellis@0.6.17` dist shows the `tool_call` deny shape (`{ block: true, reason }`) has no supporting code there — Trellis's `tool_call` handler only rewrites bash command strings and returns undefined. Trellis's `session_shutdown` also does not persist anything, and `session_start` cannot mutate model context (injection happens at `before_agent_start`). These three contracts are therefore unverified assumptions, not design facts. See `10-05-pi-extension/research/trellis-pi-reference.md`; the child task gates all extension work on real-host observation of them.
 
 ## 5. Compatibility and Safety
 
