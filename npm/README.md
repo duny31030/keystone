@@ -100,9 +100,9 @@ keystone events --session <id>
 | Platform | Status | Capabilities |
 |---|---|---|
 | CodeBuddy | Verified | Project/task context, file-tool deny, plan/completion gates, Stop reminder, SessionEnd metadata |
-| Claude Code | Experimental | Project settings, context hooks, native file-tool deny renderer and SessionEnd configuration are implemented; real host smoke is still required |
-| Codex | Experimental (context only) | `.codex/hooks.json` with a single `UserPromptSubmit` registration; no file-tool deny, strict gate, Stop or SessionEnd |
-| Pi | Shared skills only | Project-level `.agents/skills/` install; no Python Hook compatibility claim, TypeScript extension is deferred |
+| Claude Code | Verified (headless) | Context injection, native file-tool deny, plan/completion gates, Stop reminder **and enforce block**, SessionEnd metadata — all verified via real `claude -p` sessions; interactive TUI not yet covered |
+| Codex | Verified (context only) | `.codex/hooks.json` with a single `UserPromptSubmit` registration, verified via real `codex exec` sessions; no file-tool deny, strict gate, Stop or SessionEnd by design |
+| Pi | Shared skills verified; extension planned | `.agents/skills/` install verified as natively discovered by real Pi; TypeScript extension (context/deny/SessionEnd) is a separate in-planning task, host contracts already measured |
 
 ```bash
 # CodeBuddy remains the default
@@ -114,7 +114,9 @@ keystone doctor --platform claude
 keystone uninstall --platform claude
 ```
 
-Claude registers only native file tools (`Write|Edit|MultiEdit|NotebookEdit`) for PreToolUse. It does not claim Bash or MCP write protection. Claude `Stop` enforce remains experimental until verified in a real Claude Code session.
+Claude registers only native file tools (`Write|Edit|MultiEdit|NotebookEdit`) for PreToolUse. It does not claim Bash or MCP write protection. Claude `Stop` enforce was verified in headless mode: Claude honors the block output, retries with `stop_hook_active=true`, and Keystone's loop guard then releases the session.
+
+**PATH pitfall**: hook registration uses the bare `keystone-hook` command. If an older global copy (e.g. npm `keystone-hook@0.1.0`) shadows your install, every hook exits non-zero and fail-open silently swallows it — hooks appear registered but do nothing. Keep one install current (`npm update -g keystone-hook` / `pip install -U keystone-hook`), or register an absolute path with `--hook-command`.
 
 ### Codex（context-only）
 
@@ -130,9 +132,9 @@ keystone uninstall --platform codex
 
 1. 在用户 config 启用 `[features] hooks = true`（旧版本用对应的 legacy 开关）；
 2. 把项目标记为 trusted；
-3. 在 interactive Codex 中运行 `/hooks` 审批 Keystone command。
+3. 审批该项目的 Keystone hook：hook 信任按项目 `hooks.json` 路径逐个记账，每个项目需在 interactive Codex 中运行 `/hooks` 审批一次；自动化/headless 场景可用 `codex exec --dangerously-bypass-hook-trust`（自行评估风险）。
 
-`keystone doctor --platform codex` 会把这三点和“不提供 file-tool deny / strict gate / Stop / SessionEnd”作为 WARN 明确列出，不会把未验证的能力伪装成可用。Codex 与 Pi 共用 `.agents/skills/` 目标，`keystone skills install --platform codex|pi` 都会安装到该目录。
+`UserPromptSubmit` context 注入已在真实 `codex exec` 会话验证（含模型确实收到注入内容的暗号测试）；未满足上述前置条件时 hook 不触发且**无任何报错**，这是最常见的"看起来没生效"原因。`keystone doctor --platform codex` 会把这三点和"不提供 file-tool deny / strict gate / Stop / SessionEnd"作为 WARN 明确列出，不会把未验证的能力伪装成可用。Codex 与 Pi 共用 `.agents/skills/` 目标，`keystone skills install --platform codex|pi` 都会安装到该目录。
 
 ## Workflow Skills
 

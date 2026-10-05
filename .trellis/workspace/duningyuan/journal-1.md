@@ -234,3 +234,41 @@ COMPLETED 写入拒绝、.keystone 状态保护、计划阶段拦截、Stop remi
 
 - 在真实 Claude Code / Codex 中执行 smoke checklist，通过后更新 README capability status
 - 新建独立任务实现 Pi TypeScript extension（before_agent_start / tool_call / session_shutdown）
+
+## Session 11: 三平台真实宿主验证
+
+**Date**: 2026-10-05
+**Task**: Keystone 多平台适配设计（含子任务 pi-extension）
+**Branch**: `main`
+
+### Summary
+
+Claude/Codex/Pi 三个平台的真实宿主验证全部完成，证据落盘 research/；capability 声明按实测升级；Pi extension 任务的阻塞性 R1 观测完成，三项契约全部确认可用。
+
+### Main Changes
+
+- Claude（headless `claude -p`）：9/9 通过，Stop enforce 实测被宿主尊重且循环保护生效 → Verified (headless)
+- Codex（`codex exec`）：UserPromptSubmit 三前置条件确认（用户级 feature + trust + hook 信任），暗号测试证明注入到达模型 → Verified (context only)
+- Pi（`pi -p` + 探针 extension）：`tool_call {block:true}` 生效、session id 可得、`before_agent_start` 双通道注入生效；发现项目级 extension 需 trust、handler 抛错 fail-closed（须显式 fail-open）、bash 可绕过 write/edit 门禁
+- 横向发现：全局旧版 keystone-hook@0.1.0 PATH 陷阱会让 hook 静默失效（README 已加说明）
+- adapter capability_warnings、README 矩阵、CHANGELOG 按实测更新；新增 Pi extension 子任务 research 文档
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| (see git log) | docs: record real-host verification for claude/codex/pi |
+
+### Testing
+
+- [OK] 133 tests passed（含更新后的 claude doctor 文案断言）
+- [OK] 三平台真实宿主验证（headless 自动化，非模拟）
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Pi extension R2-R5：bridge CLI、extension bundle、tsc 类型检查、打包断言（子任务 10-05-pi-extension）
+- 考虑发布 0.3.0（CHANGELOG [Unreleased] 已齐）

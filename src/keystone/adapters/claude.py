@@ -1,4 +1,4 @@
-"""Claude Code platform adapter. Hook behavior remains experimental until host smoke tests pass."""
+"""Claude Code platform adapter. All registered hooks verified in headless (claude -p) sessions 2026-10-05."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ class ClaudeAdapter(JsonHookAdapter):
     settings_relative_path = ".claude/settings.json"
     expected_events = ("SessionStart", "UserPromptSubmit", "PreToolUse", "Stop", "SessionEnd")
     retired_events: tuple[str, ...] = ()
-    capabilities = PlatformCapabilities(True, True, "experimental", True)
+    capabilities = PlatformCapabilities(True, True, "verified", True)
 
     def build_hooks(self, runner_command: str) -> dict:
         def rule(event: str) -> dict:
@@ -53,4 +53,7 @@ class ClaudeAdapter(JsonHookAdapter):
         return 5 if event in {"SessionStart", "SessionEnd"} else 1
 
     def capability_warnings(self) -> tuple[str, ...]:
-        return ("Claude Hook 配置已注册；宿主注入、file-tool deny、Stop 行为待真实 smoke 验证",)
+        return (
+            "Claude Hook 已在 headless（claude -p）真实会话验证：context、file-tool deny、Stop enforce、SessionEnd 均生效",
+            "交互式 TUI 模式尚未覆盖验证；仅拦截原生文件工具，不承诺 Bash/MCP 写入保护",
+        )

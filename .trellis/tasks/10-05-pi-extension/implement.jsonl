@@ -1,3 +1,4 @@
 {"file": ".trellis/tasks/10-05-pi-extension/research/trellis-pi-reference.md", "reason": "Trellis 0.6.17 Pi extension 源码实证：修正 tool_call deny / session_shutdown / session_start 三处假设，给出 before_agent_start 与 python bridge 的可用契约"}
 {"file": ".trellis/tasks/10-03-multi-platform-adapter/design.md", "reason": "adapter 分层与 semantic effect（InjectContext/DenyTool）设计，Pi extension 是其中未完成的 semantic renderer"}
 {"file": ".trellis/tasks/10-03-multi-platform-adapter/prd.md", "reason": "多平台能力矩阵规则：未验证能力必须标 unsupported，不得静默降级"}
+{"file": ".trellis/tasks/10-05-pi-extension/research/pi-host-observations.md", "reason": "R1 阻塞项实测答案：tool_call block/session id/before_agent_start 注入均可用，含 fail-closed 与 project trust 发现"}

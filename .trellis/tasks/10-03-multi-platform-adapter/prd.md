@@ -82,11 +82,20 @@ keystone uninstall --platform <name>
 
 - [x] 现有 CodeBuddy init/doctor/uninstall 行为在 adapter 重构后无回归
 - [x] `init --platform codebuddy` 与当前 settings diff 等价
-- [x] Claude adapter 可无损写/卸载自身注册（真实宿主 smoke test 待用户在 `scripts/claude-smoke.sh` 生成的项目中执行）
-- [x] Codex adapter 不会承诺未验证的 deny/Stop 能力，并显式诊断 hooks/trust/approval 前置条件
-- [ ] Pi adapter 作为 extension 实现，而不是伪 JSON Hook；tool_call block 与 context 注入有真实 smoke test（**拆分为独立后续任务**，本批只做 shared `.agents/skills`）
-- [x] 每个 adapter 的 README capability matrix 标记 verified/experimental/unverified
+- [x] Claude adapter 可无损写/卸载自身注册；**真实宿主验证已完成**（2026-10-05 headless，见 `research/claude-host-observations.md`）
+- [x] Codex adapter 不会承诺未验证的 deny/Stop 能力，并显式诊断 hooks/trust/approval 前置条件；**UserPromptSubmit context 已真实宿主验证**（见 `research/codex-host-observations.md`）
+- [ ] Pi adapter 作为 extension 实现，而不是伪 JSON Hook；tool_call block 与 context 注入有真实 smoke test（**拆分为子任务 `10-05-pi-extension`**，本批只做 shared `.agents/skills`——该部分已在真实 Pi 验证被原生发现）
+- [x] 每个 adapter 的 README capability matrix 标记 verified/experimental/unverified（已按实测更新：Claude=Verified(headless)，Codex=Verified(context only)）
 - [x] 平台安装不修改 MCP、用户级开关或第三方配置
+
+## Host Verification Outcome (2026-10-05)
+
+真实宿主验证全部完成，证据在 `research/`：
+
+- **Claude（headless `claude -p`）**：9/9 通过——SessionStart/UserPromptSubmit context、PLANNING/COMPLETED 写入门禁、`.keystone` 状态保护、SessionEnd 落盘、Stop reminder；**Stop enforce 实测被宿主尊重**（block → 重试 `stop_hook_active=true` → 循环保护放行，无死循环），与 CodeBuddy 行为相反。
+- **Codex（`codex exec`）**：UserPromptSubmit 触发三前置条件实测确认（用户级 feature + 项目 trust + hook 信任/`--dangerously-bypass-hook-trust`）；暗号测试证明注入内容真实到达模型；确认无写入门禁（符合声明）。
+- **Pi（`pi -p` + 探针 extension）**：shared `.agents/skills/` 被原生注册为 `skill:keystone-*` 命令；extension 契约观测详见子任务 `10-05-pi-extension/research/pi-host-observations.md`。
+- **横向发现（PATH 陷阱）**：注册裸命令 `keystone-hook` 时，全局旧版（0.1.0）会静默吞掉全部 hook（exit≠0 + fail-open），表现为"注册了但无效"。README 已加说明。
 
 ## Batch Outcome (2026-10-03)
 

@@ -8,13 +8,16 @@
 
 ### Added
 - Platform adapter 层：`src/keystone/adapters/`，把配置路径、事件注册、deny 渲染、注册计数和 capability 提示从共享核心下沉到平台薄适配器
-- Codex 平台支持（context-only，experimental）：`keystone init|doctor|uninstall --platform codex` 只操作 `.codex/hooks.json`，只注册 `UserPromptSubmit` 注入任务上下文
-- Claude/Codex 真实宿主 smoke 脚本：`scripts/claude-smoke.sh`、`scripts/codex-smoke.sh`
-- `keystone skills install --platform codex|pi` 明确映射共享 `.agents/skills/`；`skills list` 显示 shared target
+- Codex 平台支持（context-only）：`keystone init|doctor|uninstall --platform codex` 只操作 `.codex/hooks.json`，只注册 `UserPromptSubmit` 注入任务上下文
+- Claude/Codex/Pi 真实宿主观测记录落盘 `.trellis/tasks/*/research/`；Pi extension 拆为子任务 `10-05-pi-extension`（宿主契约已实测：tool_call block、session id、before_agent_start 注入均可用；项目级 extension 需 project trust；handler 抛错为 fail-closed，须显式 fail-open）
+- Claude/Codex smoke 项目生成脚本：`scripts/claude-smoke.sh`、`scripts/codex-smoke.sh`
+- `keystone skills install --platform codex|pi` 明确映射共享 `.agents/skills/`；`skills list` 显示 shared target；Pi 原生识别该目录已实测确认
 
 ### Changed
+- Claude adapter 升级为 Verified（headless）：context、file-tool deny、三类门禁、Stop reminder/enforce、SessionEnd 均在真实 `claude -p` 会话验证；Stop enforce 实测被宿主尊重且循环保护生效
+- Codex UserPromptSubmit context 升级为 Verified：真实 `codex exec` 会话验证（含暗号注入测试）；capability warnings 补充 hook 信任按项目记账与 headless bypass 说明
 - `keystone status` / `keystone doctor` / hook runner 不再硬编码 CodeBuddy 事件计数、设置路径和平台白名单，一律按 `--platform` 走 adapter
-- README 平台矩阵区分 CodeBuddy verified、Claude experimental、Codex experimental (context only)、Pi shared skills only
+- README 平台矩阵按实测结果更新，并新增 PATH 陷阱说明（旧版全局 `keystone-hook` 会让 hook 静默失效）
 
 ### Notes
 - Codex 适配刻意不提供 file-tool deny、strict gate、Stop、SessionEnd；这些能力需要独立宿主验证后才可能引入

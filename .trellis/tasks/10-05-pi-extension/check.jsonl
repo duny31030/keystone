@@ -1,2 +1,3 @@
 {"file": ".trellis/tasks/10-05-pi-extension/research/trellis-pi-reference.md", "reason": "验证基准：extension 只可使用实证过的 Pi 事件与返回契约，禁止依赖推测行为"}
 {"file": ".trellis/tasks/10-03-multi-platform-adapter/prd.md", "reason": "平台安装不得修改用户级配置 / MCP / 第三方条目；能力矩阵需标记 verified/experimental/unverified"}
+{"file": ".trellis/tasks/10-05-pi-extension/research/pi-host-observations.md", "reason": "extension 实现的验证基准与已定实现决策"}

@@ -23,13 +23,14 @@ def test_claude_init_dry_run_writes_nothing(tmp_path, capsys):
     assert not (tmp_path / ".claude").exists()
 
 
-def test_claude_doctor_reports_experimental_capability(project_dir, capsys):
+def test_claude_doctor_reports_verified_headless_capability(project_dir, capsys):
     assert keystone_main(["init", "--dir", str(project_dir), "--platform", "claude", "-y"]) == 0
     capsys.readouterr()
     assert keystone_main(["doctor", "--dir", str(project_dir), "--platform", "claude"]) == 0
     output = capsys.readouterr().out
     assert ".claude/settings.json" not in output
-    assert "待真实 smoke 验证" in output
+    assert "headless" in output
+    assert "不承诺 Bash/MCP 写入保护" in output
 
 
 def test_claude_doctor_fix_does_not_touch_codebuddy(project_dir, capsys):

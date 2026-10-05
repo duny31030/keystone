@@ -41,6 +41,8 @@
 
 若 R1 任一项无法确认，对应能力标记为 unsupported 并写入 capability matrix，**不以推测实现**。
 
+> **R1 已完成（2026-10-05）**：三项契约全部实测确认可用，另有两项计划外发现（项目级 extension 需 project trust；`tool_call` handler 抛错为 fail-closed）。详见 `research/pi-host-observations.md`，其中"已定的实现决策"一节直接约束 R2/R3 设计。
+
 ### R2. Extension bundle
 
 在 R1 结论确定后，产出：
@@ -78,7 +80,7 @@ src/keystone/assets/pi/
 
 ## Acceptance Criteria
 
-- [ ] R1 三项观测已在真实 Pi 上完成，原始证据落盘 `research/pi-host-observations.md`
+- [x] R1 三项观测已在真实 Pi 上完成，原始证据落盘 `research/pi-host-observations.md`（2026-10-05，pi 1.0.2）
 - [ ] extension 由 `.pi/settings.json` 原生加载，未使用 Python hook runner
 - [ ] `before_agent_start` context 在真实 Pi 中可见（含项目名、test/build 命令、任务状态）
 - [ ] 写入门禁（若 R1 证实可行）在真实 Pi 中真实阻断 PLANNING 阶段写入；若不可行，capability matrix 标 unsupported 且 doctor WARN
