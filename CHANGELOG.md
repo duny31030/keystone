@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-08
+
 ### Added
 - Platform adapter 层：`src/keystone/adapters/`，把配置路径、事件注册、deny 渲染、注册计数和 capability 提示从共享核心下沉到平台薄适配器
 - Codex 平台支持（context-only）：`keystone init|doctor|uninstall --platform codex` 只操作 `.codex/hooks.json`，只注册 `UserPromptSubmit` 注入任务上下文

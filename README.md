@@ -37,8 +37,8 @@ HookOutput JSON → stdout，退出码 0
 # npm（Node 垫片 + 内嵌 Python 源码，无需 pip 依赖）
 npm install -g keystone-hook
 
-# PyPI（TestPyPI 测试站）
-pip install --index-url https://test.pypi.org/simple/ keystone-hook
+# PyPI（Python ≥ 3.9）
+pip install keystone-hook
 
 # 仓库内开发安装（Python ≥ 3.9，运行时零依赖）
 pip install -e .
