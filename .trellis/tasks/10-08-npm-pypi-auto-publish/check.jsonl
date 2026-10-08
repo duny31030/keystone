@@ -1,0 +1,4 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/tasks/10-08-npm-pypi-auto-publish/research/ci-publish-mechanics.md", "reason": "Check gate verifies the workflow against empirically verified semantics: probe exit codes, skip-existing, no-rebuild rule."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Guard against duplicating version-parsing or probe logic across steps; one source per concern."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Verify tag version, pyproject version, package.json version and CHANGELOG heading agree at the publish boundary."}
