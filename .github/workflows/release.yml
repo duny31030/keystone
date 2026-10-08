@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,6 +14,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Validate tag matches pyproject version
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PYPROJECT_VERSION="$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
+          echo "tag=$TAG_VERSION pyproject=$PYPROJECT_VERSION"
+          if [ "$TAG_VERSION" != "$PYPROJECT_VERSION" ]; then
+            echo "::error::tag ($TAG_VERSION) != pyproject.toml ($PYPROJECT_VERSION)"
+            exit 1
+          fi
 
       - name: Install dependencies
         run: pip install -e '.[dev]'
@@ -23,6 +35,22 @@ jobs:
 
       - name: Sync npm package
         run: python3 scripts/sync_npm.py
+
+      - name: Verify sync produced no drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYPROJECT_VERSION="$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
+          NPM_VERSION="$(python3 -c "import json; print(json.load(open('npm/package.json'))['version'])")"
+          echo "pyproject=$PYPROJECT_VERSION npm=$NPM_VERSION"
+          if [ "$PYPROJECT_VERSION" != "$NPM_VERSION" ]; then
+            echo "::error::pyproject.toml ($PYPROJECT_VERSION) != npm/package.json ($NPM_VERSION) after sync"
+            exit 1
+          fi
+          if ! git diff --exit-code -- npm/python npm/package.json npm/README.md npm/LICENSE; then
+            echo "::error::scripts/sync_npm.py rewrote npm/ during this run - the tagged commit has stale npm payload"
+            exit 1
+          fi
 
       - name: Build Python artifacts
         run: |
@@ -35,40 +63,64 @@ jobs:
           npm pack --dry-run
           npm pack
 
-      - name: Upload artifacts
+      - name: Upload Python artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: release-artifacts
+          name: python-dist
+          if-no-files-found: error
           path: |
-            dist/
-            npm/*.tgz
+            dist/*.whl
+            dist/*.tar.gz
 
-  # 发布步骤默认注释，等用户决定后再启用
-  # publish-npm:
-  #   needs: test
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: '22'
-  #         registry-url: 'https://registry.npmjs.org'
-  #     - run: python3 scripts/sync_npm.py
-  #     - run: cd npm && npm publish --access public
-  #       env:
-  #         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Upload npm tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-tarball
+          if-no-files-found: error
+          path: npm/*.tgz
 
-  # publish-testpypi:
-  #   needs: test
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-python@v5
-  #       with:
-  #         python-version: '3.11'
-  #     - run: pip install build
-  #     - run: python -m build
-  #     - uses: pypa/gh-action-pypi-publish@release/v1
-  #       with:
-  #         repository-url: https://test.pypi.org/legacy/
-  #         password: ${{ secrets.TESTPYPI_TOKEN }}
+  publish-pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_TOKEN }}
+          skip-existing: true
+
+  publish-npm:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-tarball
+          path: npm-dist/
+
+      - name: Show downloaded npm tarball
+        run: ls -l npm-dist
+
+      - name: Publish to npm (skip if version already exists)
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "publishing keystone-hook@${VERSION}"
+          if npm view "keystone-hook@${VERSION}" version >/dev/null 2>&1; then
+            echo "::notice::keystone-hook@${VERSION} already on npm - skipping publish"
+            exit 0
+          fi
+          npm publish ./npm-dist/*.tgz --access public

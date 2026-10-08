@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Keystone 发布脚本：校验版本、跑测试、同步 npm、构建产物、打 tag、推送。
-# 用法：./scripts/release.sh 0.2.1
-# 发布到 registry 的部分默认注释，等用户决定后再启用。
+# 用法：./scripts/release.sh 0.3.0
+# 推送 tag 后，.github/workflows/release.yml 会自动发布到 PyPI 与 npmjs。
 
 set -euo pipefail
 
@@ -11,7 +11,7 @@ cd "$ROOT"
 VERSION="${1:-}"
 if [ -z "$VERSION" ]; then
     echo "用法: $0 <version>"
-    echo "示例: $0 0.2.1"
+    echo "示例: $0 0.3.0"
     exit 1
 fi
 
@@ -100,10 +100,17 @@ echo "推送 main 和 tag..."
 git push origin main --tags
 
 echo ""
-echo "✓ 发布准备完成"
+echo "✓ tag 已推送，CI 将自动发布"
 echo ""
-echo "下一步（手动执行，或启用 CI 后自动）："
-echo "  npm publish --access public        # npm 发布"
-echo "  uv publish --publish-url https://test.pypi.org/legacy/  # TestPyPI 发布"
+echo "Release workflow 会依次执行："
+echo "  1. 校验 tag 与 pyproject.toml 版本一致"
+echo "  2. 跑测试（失败即中止发布）"
+echo "  3. 同步 npm 源码与版本号"
+echo "  4. 构建产物并发布到 PyPI 与 npmjs"
 echo ""
-echo "如果要自动发布，取消 .github/workflows/release.yml 中发布步骤的注释。"
+echo "前置条件（在 GitHub 仓库 Settings → Secrets and variables → Actions 配置）："
+echo "  PYPI_TOKEN  PyPI API token（首次发布 keystone-hook 需用 Entire account 范围，"
+echo "              发布成功后可换成 project-scoped token）"
+echo "  NPM_TOKEN   npmjs automation token"
+echo ""
+echo "注意：包名与版本一经发布不可删除，只能 yank（PyPI）/ 72 小时内 unpublish（npm）。"
