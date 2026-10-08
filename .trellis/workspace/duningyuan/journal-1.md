@@ -272,3 +272,60 @@ Claude/Codex/Pi 三个平台的真实宿主验证全部完成，证据落盘 res
 
 - Pi extension R2-R5：bridge CLI、extension bundle、tsc 类型检查、打包断言（子任务 10-05-pi-extension）
 - 考虑发布 0.3.0（CHANGELOG [Unreleased] 已齐）
+
+---
+
+## Session 12: npm 与 PyPI 自动发布流水线
+
+**Date**: 2026-10-08
+**Task**: npm 与 PyPI 自动发布流水线 (`10-08-npm-pypi-auto-publish`)
+**Branch**: `main`
+
+### Summary
+
+启用被注释掉的 CI 发布 job：推送 `v*` tag 后自动发布到正式 PyPI 与 npmjs。首次发布定为 0.3.0（HEAD 已积累大量 [Unreleased] 功能，发 0.2.1 会让包内容与 CHANGELOG 矛盾）。
+
+### Main Changes
+
+- `.github/workflows/release.yml` 重写：`build`（门禁 + 产物）→ `publish-pypi` / `publish-npm`（各自 `needs: build`，只下载产物不重建）
+- `build` 门禁顺序：tag↔pyproject 版本比对（`tomllib`，最前，快速失败）→ pytest → `sync_npm.py` → 同步零漂移校验（版本一致 + `git diff --exit-code` 覆盖 npm 生成物）
+- 产物拆为 `python-dist` / `npm-tarball`，消除多 path 通配符下的目录结构不确定性
+- 幂等：PyPI 用 action 的 `skip-existing`；npm 无等价开关，改用 `npm view` 探针（实测 exit 0 = 已存在 → 跳过，exit 1 = 不存在 → 发布），探测失败方向 fail-closed
+- `scripts/release.sh` 收尾改为「tag 已推送，CI 将自动发布」，移除手敲 `npm publish` / `uv publish` 提示，补充 secrets 前置条件与不可逆警告
+- 版本 0.2.1 → 0.3.0（pyproject / `__init__` / npm 生成物），CHANGELOG 的 [Unreleased] 收为 `[0.3.0] - 2026-10-08`
+- README 安装命令从 TestPyPI 改为正式 PyPI
+- 新增 `.trellis/spec/backend/release-and-publishing.md`：版本单一来源、CI 门禁顺序、探针契约、private repo 无法用 OIDC、发布不可逆
+
+### Key Findings
+
+- 仓库是 private → PyPI trusted publishing (OIDC) 不可用，api.github.com 返回 404，只能 token auth
+- `gh-action-pypi-publish` 没有 `token:` 输入，凭据走 `password:`；token 流程不需要 `permissions:` 块
+- `keystone-hook` 在 pypi.org 尚未注册 → 首次发布只能用 account-scoped token，之后可换 project-scoped
+- npm 重复版本发布是硬失败，探针是必需的（不能靠 registry 侧幂等）
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e9e9353` | `chore(release): cut 0.3.0` |
+| `7f4b40c` | `ci: auto-publish to npm and PyPI on v* tag` |
+| `792893b` | `docs(trellis): record release flow and publishing constraints` |
+
+### Testing
+
+- [OK] 133 tests passed（`.venv/bin/pytest` 在本机可用；此前误判为损坏，实为 shell 中 `python` 被 AppImage 遮蔽导致的控制台输出误导）
+- [OK] `uv build` + `uvx twine check dist/*` → PASSED
+- [OK] YAML 解析、job 图、触发条件、无重建、无 permissions、凭据仅引用 secret
+- [OK] 探针语义实测：`npm view keystone-hook@0.1.0 version` exit 0；`@0.3.0` exit 1
+- [OK] tag 校验对抗矩阵 8 组输入（含 `vv0.3.0`、`v0.3.0-rc1`、`refs/tags/...`）无误通过
+- [NOT VERIFIED] 真实发布到 registry —— 需 secrets + 真实 tag 推送，属外部不可逆动作，留给用户
+
+### Status
+
+[OK] **Completed**（已提交并推送到 origin/main；未打 tag，未触发任何发布）
+
+### Next Steps
+
+- 在 GitHub Settings → Secrets 配置 `PYPI_TOKEN`（首次用 Entire account 范围）与 `NPM_TOKEN`
+- 执行 `./scripts/release.sh 0.3.0` 或手动 `git tag v0.3.0 && git push origin v0.3.0` 触发首次发布
+- 若 branch protection 有名为 `test` 的 required check，需改名为 `build`（job 已重命名）
